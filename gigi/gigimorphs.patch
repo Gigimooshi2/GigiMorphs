@@ -45,6 +45,99 @@ index c364a45a2..f973ca237 100644
      /**
       * Injection point.
       */
+diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java
+new file mode 100644
+index 000000000..7521e1c53
+--- /dev/null
++++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java
+@@ -0,0 +1,87 @@
++package app.morphe.extension.youtube.patches;
++
++import android.app.Activity;
++import android.os.SystemClock;
++
++import java.util.Map;
++
++import app.morphe.extension.shared.Logger;
++import app.morphe.extension.shared.Utils;
++import app.morphe.extension.youtube.shared.ShortsPlayerState;
++
++/**
++ * GigiMorphs.
++ * <p>
++ * Tapping a Short's "full video" link opens the regular player on top of a Shorts player
++ * that stays alive underneath. Both players then fight over playback, so the full video
++ * pauses on rotation, screen lock and when leaving the app (no PiP).
++ * <p>
++ * Fix: when a regular video is about to open while the Shorts player is open,
++ * cancel it, close the Shorts player, then open the video again as a normal watch page.
++ */
++@SuppressWarnings("unused")
++public final class GigiShortsFullVideoLinkPatch {
++
++    private static final long REOPEN_WINDOW_MS = 5000;
++    private static final long CLOSE_SHORTS_DELAY_MS = 450;
++
++    private static volatile String reopeningVideoId;
++    private static volatile long reopeningTime;
++
++    /**
++     * Injection point.
++     *
++     * @return true to cancel opening the video.
++     */
++    public static boolean onVideoIntentLoaded(Map<Object, Object> playbackStartDescriptorMap, String videoId) {
++        try {
++            final boolean shortsOpen = ShortsPlayerState.isOpen();
++            Logger.printDebug(() -> "GigiMorphs: video intent, videoId: " + videoId + " shortsOpen: " + shortsOpen);
++
++            if (videoId == null || videoId.isEmpty()) {
++                return false;
++            }
++
++            final long now = SystemClock.uptimeMillis();
++            if (videoId.equals(reopeningVideoId) && now - reopeningTime < REOPEN_WINDOW_MS) {
++                // This is our own reopen. Never intercept twice, even if Shorts is somehow still open.
++                Logger.printDebug(() -> "GigiMorphs: letting our reopened video through: " + videoId);
++                reopeningVideoId = null;
++                return false;
++            }
++
++            if (!shortsOpen) {
++                return false;
++            }
++
++            Activity activity = Utils.getActivity();
++            if (activity == null) {
++                Logger.printDebug(() -> "GigiMorphs: no activity, not intercepting");
++                return false;
++            }
++
++            reopeningVideoId = videoId;
++            reopeningTime = now;
++            Logger.printDebug(() -> "GigiMorphs: intercepting full video link, closing Shorts then reopening: " + videoId);
++
++            Utils.runOnMainThreadDelayed(() -> {
++                try {
++                    // Closes the Shorts player (same as pressing back).
++                    activity.onBackPressed();
++                } catch (Exception ex) {
++                    Logger.printException(() -> "GigiMorphs: back press failure", ex);
++                }
++            }, 0);
++
++            Utils.runOnMainThreadDelayed(() -> {
++                Logger.printDebug(() -> "GigiMorphs: reopening " + videoId + " shortsOpen: " + ShortsPlayerState.isOpen());
++                LoadVideoPatch.openVideoIntent("https://www.youtube.com/watch?v=" + videoId, false);
++            }, CLOSE_SHORTS_DELAY_MS);
++
++            return true;
++        } catch (Exception ex) {
++            Logger.printException(() -> "GigiMorphs: onVideoIntentLoaded failure", ex);
++            return false;
++        }
++    }
++}
 diff --git a/patches/build.gradle.kts b/patches/build.gradle.kts
 index 831d7ff19..226a37444 100644
 --- a/patches/build.gradle.kts
@@ -67,3 +160,43 @@ index 831d7ff19..226a37444 100644
          license = "GNU General Public License v3.0, with additional GPL section 7 requirements"
      }
  }
+diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/layout/shortsplayer/GigiShortsFullVideoLinkPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/layout/shortsplayer/GigiShortsFullVideoLinkPatch.kt
+new file mode 100644
+index 000000000..7099b32b8
+--- /dev/null
++++ b/patches/src/main/kotlin/app/morphe/patches/youtube/layout/shortsplayer/GigiShortsFullVideoLinkPatch.kt
+@@ -0,0 +1,34 @@
++package app.morphe.patches.youtube.layout.shortsplayer
++
++import app.morphe.patcher.patch.bytecodePatch
++import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
++import app.morphe.patches.youtube.misc.playertype.playerTypeHookPatch
++import app.morphe.patches.youtube.misc.playservice.versionCheckPatch
++import app.morphe.patches.youtube.misc.settings.settingsPatch
++import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
++import app.morphe.patches.youtube.shared.hookVideoIntent
++import app.morphe.patches.youtube.shared.openVideoIntentPatch
++
++private const val EXTENSION_CLASS =
++    "Lapp/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch;"
++
++@Suppress("unused")
++val gigiShortsFullVideoLinkPatch = bytecodePatch(
++    name = "Fix Shorts full video link",
++    description = "Opens a Short's full-video link in the regular player with the Shorts player closed, " +
++        "so the video keeps playing on rotation, screen lock and in PiP. (GigiMorphs)",
++) {
++    compatibleWith(COMPATIBILITY_YOUTUBE)
++
++    dependsOn(
++        sharedExtensionPatch,
++        settingsPatch,
++        versionCheckPatch,
++        playerTypeHookPatch,
++        openVideoIntentPatch,
++    )
++
++    execute {
++        hookVideoIntent(EXTENSION_CLASS, detectVideo = true, detectShorts = false)
++    }
++}

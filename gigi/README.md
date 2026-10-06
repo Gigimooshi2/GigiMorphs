@@ -8,6 +8,8 @@ Add to Morphe Manager: https://morphe.software/add-source?github=Gigimooshi2/Gig
 ## Fixes
 - **Background play / PiP for a video opened from a Short's full-video link.** Upstream blocks background play whenever the Shorts player is attached, even when the regular player is open on top of it. Now allowed when the regular player is maximized, fullscreen, minimized or in PiP.
 
+- **Shorts full-video link opens properly.** New patch "Fix Shorts full video link": when a regular video opens while the Shorts player is open, it closes the Shorts player and reopens the video as a normal watch page, so the two players stop fighting over playback (fixes pause on rotation, screen lock, no PiP).
+
 ## How it works
 - `build.yml`: on push to main, builds the `.mpp`, creates a release, updates `patches-bundle.json`.
 - `sync-upstream.yml`: daily, rebuilds the tree from upstream `main`, re-applies `gigimorphs.patch`, then builds. Fails loudly if the patch no longer applies.
