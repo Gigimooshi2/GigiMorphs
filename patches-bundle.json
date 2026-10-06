@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-10-06T13:17:51",
-  "description": "GigiMorphs 1.46.0-gigi.202610061314: upstream Morphe patches + background play fix for videos opened from a Short's full-video link.",
-  "download_url": "https://github.com/Gigimooshi2/GigiMorphs/releases/download/v1.46.0-gigi.202610061314/patches-1.46.0-gigi.202610061314.mpp",
+  "created_at": "2026-10-06T13:19:09",
+  "description": "GigiMorphs 1.46.0-gigi.202610061318: upstream Morphe patches + background play fix for videos opened from a Short's full-video link.",
+  "download_url": "https://github.com/Gigimooshi2/GigiMorphs/releases/download/v1.46.0-gigi.202610061318/patches-1.46.0-gigi.202610061318.mpp",
   "signature_download_url": "",
-  "version": "1.46.0-gigi.202610061314"
+  "version": "1.46.0-gigi.202610061318"
 }
