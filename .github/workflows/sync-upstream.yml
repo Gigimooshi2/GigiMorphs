@@ -1,0 +1,52 @@
+name: Sync upstream Morphe patches
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.merge.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge upstream main
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/MorpheApp/morphe-patches.git
+          git fetch upstream main
+          up=$(git rev-parse upstream/main)
+          if [ "$up" = "$(cat .gigi-upstream)" ]; then
+            echo "Already up to date with $up"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Rebuild the tree from upstream as a single commit (no upstream history pushed,
+          # so the default token never touches workflow files), keeping our own files.
+          git rm -rq .
+          git checkout "$up" -- .
+          rm -rf .github && git rm -rq --cached --ignore-unmatch .github
+          git checkout HEAD -- .github patches-bundle.json gigi
+          git apply --index --3way gigi/gigimorphs.patch || { echo "::error::gigimorphs.patch no longer applies to upstream $up - needs a manual fix"; git status; exit 1; }
+          echo "$up" > .gigi-upstream && git add .gigi-upstream
+          git commit -q -m "chore: sync upstream Morphe patches ${up:0:7}"
+          git push origin HEAD:main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: sync
+    if: needs.sync.outputs.changed == 'true'
+    uses: ./.github/workflows/build.yml
+    secrets: inherit

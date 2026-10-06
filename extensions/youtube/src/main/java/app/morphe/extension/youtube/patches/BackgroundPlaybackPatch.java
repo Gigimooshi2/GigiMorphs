@@ -186,13 +186,39 @@ public class BackgroundPlaybackPatch {
         // 7. Close the Short
         // 8. Resume playing the regular video
         // 9. Minimize the app (PiP should appear)
+        PlayerType current = PlayerType.getCurrent();
+
         if (ShortsPlayerState.isOpen()) {
+            // GigiMorphs fix: a regular video opened from a Short's "full video" link
+            // plays in the regular player on top of the still-attached Shorts player.
+            // In that case the regular player is visible, so allow background play / PiP.
+            if (isRegularPlayerOnTopOfShorts(current)) {
+                Logger.printDebug(() -> "GigiMorphs: allowing background play, regular player over Shorts: " + current);
+                return true;
+            }
+            Logger.printDebug(() -> "GigiMorphs: blocking background play, Shorts open, player type: " + current);
             return false;
         }
 
         // Check if the video player is opened and it's not playing in the feed.
-        PlayerType current = PlayerType.getCurrent();
         return !current.isNoneOrHidden() && current != PlayerType.INLINE_MINIMAL;
+    }
+
+    /**
+     * GigiMorphs. Regular player states that mean a regular video is on screen
+     * (or in PiP / miniplayer), as opposed to HIDDEN which means a Short is covering it.
+     */
+    private static boolean isRegularPlayerOnTopOfShorts(PlayerType type) {
+        switch (type) {
+            case WATCH_WHILE_MAXIMIZED:
+            case WATCH_WHILE_FULLSCREEN:
+            case WATCH_WHILE_SLIDING_MAXIMIZED_FULLSCREEN:
+            case WATCH_WHILE_PICTURE_IN_PICTURE:
+            case WATCH_WHILE_MINIMIZED:
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**
