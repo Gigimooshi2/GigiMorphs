@@ -1487,4 +1487,15 @@ Limitation: Reverts to old style \'More videos\' overlay"</string>
     <string name="morphe_player_icon_style_entry_sharp" translatable="false">Sharp</string>
     <string name="morphe_player_icon_style_entry_custom">Custom</string>
     <string name="morphe_shorts_icon_style_title">Shorts icon style</string>
+    <!-- misc.gigilogs.gigiLogUploadPatch (GigiMorphs) -->
+    <string name="gigi_logs_screen_title" translatable="false">Upload logs (GigiMorphs)</string>
+    <string name="gigi_logs_screen_summary" translatable="false">Send a log snapshot to a private GitHub repo</string>
+    <string name="gigi_logs_upload_title" translatable="false">Upload logs now</string>
+    <string name="gigi_logs_upload_summary" translatable="false">Morphe log buffer plus this app's recent logcat. Turn on Debug logging first for useful logs.</string>
+    <string name="gigi_logs_auto_crash_title" translatable="false">Upload after a crash</string>
+    <string name="gigi_logs_auto_crash_summary" translatable="false">After a crash or freeze, upload on the next start. At most 6 automatic uploads a day.</string>
+    <string name="gigi_logs_token_title" translatable="false">GitHub token</string>
+    <string name="gigi_logs_token_summary" translatable="false">Fine-grained token with Contents read and write on the logs repo only</string>
+    <string name="gigi_logs_repo_title" translatable="false">Logs repo</string>
+    <string name="gigi_logs_repo_summary" translatable="false">owner/name of the private repo the logs go to</string>
 </resources>
