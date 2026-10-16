@@ -12,6 +12,8 @@ Add to Morphe Manager: https://morphe.software/add-source?github=Gigimooshi2/Gig
 
 - **Upload logs.** New patch "Upload logs" (Settings → Misc → Upload logs): uploads a gzipped snapshot (Morphe log buffer + this app's recent logcat) to a private GitHub repo, manually or automatically after a crash/ANR on the next start (max 6 automatic uploads a day). The token is entered on the phone, never built into the bundle.
 
+- **Don't recommend channel for feed Shorts.** New patch: adds "Don't recommend channel" to the 3-dot menu of Shorts in the feed. It fetches the Short's player menu (`reel/reel_item_watch`), takes its "Don't recommend this channel" feedback token and sends it to `feedback`.
+
 ## How it works
 - `build.yml`: on push to main, builds the `.mpp`, creates a release, updates `patches-bundle.json`.
 - `sync-upstream.yml`: daily, rebuilds the tree from upstream `main`, re-applies `gigimorphs.patch`, then builds. Fails loudly if the patch no longer applies.
