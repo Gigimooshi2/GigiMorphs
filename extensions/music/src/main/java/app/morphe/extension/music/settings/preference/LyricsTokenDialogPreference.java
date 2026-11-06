@@ -12,10 +12,6 @@ import static app.morphe.extension.shared.StringRef.str;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
-import android.content.Intent;
-import android.graphics.drawable.ShapeDrawable;
-import android.graphics.drawable.shapes.RoundRectShape;
-import android.net.Uri;
 import android.preference.Preference;
 import android.text.InputType;
 import android.util.Pair;
@@ -34,7 +30,6 @@ import app.morphe.extension.music.patches.lyrics.requests.DeezerProvider;
 import app.morphe.extension.music.patches.lyrics.requests.MusixmatchProvider;
 import app.morphe.extension.music.patches.lyrics.requests.SpotifyProvider;
 import app.morphe.extension.music.settings.Settings;
-import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.settings.StringSetting;
 import app.morphe.extension.shared.theme.ThemeUtils;
@@ -213,7 +208,7 @@ public class LyricsTokenDialogPreference extends Preference {
         instructionParams.bottomMargin = Dim.dp12;
         content.addView(instruction, instructionParams);
 
-        EditText tokenInput = createThemedEditText(context);
+        EditText tokenInput = ThemedInput.create(context);
         tokenInput.setHint(str(hintRes));
         tokenInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         if (multiline) {
@@ -292,16 +287,7 @@ public class LyricsTokenDialogPreference extends Preference {
         if (getTokenUrl != null) {
             Button getTokenBtn = CustomDialog.createButton(context, null,
                     str("morphe_music_token_dialog_get_token"),
-                    () -> {
-                        try {
-                            Intent intent = new Intent(Intent.ACTION_VIEW,
-                                    Uri.parse(getTokenUrl));
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            context.startActivity(intent);
-                        } catch (Exception ex) {
-                            Logger.printDebug(() -> "Get token button click failure", ex);
-                        }
-                    },
+                    () -> ThemedInput.openInBrowser(context, getTokenUrl, "Get token button"),
                     false, false);
 
             LinearLayout.LayoutParams getTokenParams = new LinearLayout.LayoutParams(
@@ -326,19 +312,5 @@ public class LyricsTokenDialogPreference extends Preference {
         } catch (WindowManager.BadTokenException ignored) {
             activeDialog = null;
         }
-    }
-
-    private static EditText createThemedEditText(Context context) {
-        EditText editText = new EditText(context);
-        editText.setSingleLine(true);
-        editText.setTextSize(16);
-        editText.setTextColor(ThemeUtils.getAppForegroundColor());
-        ShapeDrawable background = new ShapeDrawable(new RoundRectShape(
-                Dim.roundedCorners(10), null, null));
-        background.getPaint().setColor(ThemeUtils.getEditTextBackground());
-        editText.setPadding(Dim.dp12, Dim.dp8, Dim.dp12, Dim.dp8);
-        editText.setBackground(background);
-        editText.setClipToOutline(true);
-        return editText;
     }
 }

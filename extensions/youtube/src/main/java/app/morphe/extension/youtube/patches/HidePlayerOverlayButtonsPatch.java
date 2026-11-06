@@ -13,6 +13,7 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.DrawableWrapper;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -37,6 +38,12 @@ public final class HidePlayerOverlayButtonsPatch {
 
     private static final boolean HIDE_AUTOPLAY_BUTTON_ENABLED = Settings.HIDE_AUTOPLAY_BUTTON.get();
     private static final Boolean HIDE_FULLSCREEN_BUTTON_ENABLED = Settings.HIDE_FULLSCREEN_BUTTON.get();
+
+    /**
+     * Container of the captions button of the inline player of the feed.
+     */
+    private static final int INLINE_CAPTIONS_BUTTON_CONTAINER_ID =
+            ResourceUtils.getIdentifier(ResourceType.ID, "caption_toggle_container");
 
     private static final int CONTROL_BUTTONS_BACKGROUND_OPACITY =
             SeekBarPreference.clampToRange(Settings.PLAYER_CONTROL_BUTTONS_BACKGROUND_OPACITY);
@@ -89,10 +96,28 @@ public final class HidePlayerOverlayButtonsPatch {
     /**
      * Injection point.
      */
+    public static void hideCastButton(MenuItem menuItem) {
+        if (Settings.HIDE_CAST_BUTTON.get()) {
+            menuItem.setVisible(false);
+            menuItem.setEnabled(false);
+        }
+    }
+
+    /**
+     * Injection point.
+     */
     public static void hideCaptionsButton(ImageView imageView) {
         if (imageView == null) return;
 
-        imageView.setVisibility(Settings.HIDE_CAPTIONS_BUTTON.get() ? ImageView.GONE : ImageView.VISIBLE);
+        final boolean hide = Settings.HIDE_CAPTIONS_BUTTON.get();
+        imageView.setVisibility(hide ? ImageView.GONE : ImageView.VISIBLE);
+
+        // The inline player of the feed (feed autoplay) shows the button over a round background
+        // of its container, which would stay as an empty button.
+        if (hide && imageView.getParent() instanceof View container
+                && container.getId() == INLINE_CAPTIONS_BUTTON_CONTAINER_ID) {
+            container.setVisibility(View.GONE);
+        }
     }
 
     /**

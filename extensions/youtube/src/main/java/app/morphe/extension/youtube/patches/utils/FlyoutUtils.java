@@ -7,6 +7,8 @@
 
 package app.morphe.extension.youtube.patches.utils;
 
+import static app.morphe.extension.shared.settings.preference.ColorPickerPreference.DISABLED_ALPHA;
+
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Dialog;
@@ -15,17 +17,16 @@ import android.content.res.ColorStateList;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
-import android.os.Handler;
-import android.os.Looper;
-import android.text.TextUtils;
-import android.util.Base64;
+import android.support.v7.widget.RecyclerView;
 import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.ViewTreeObserver;
 import android.view.Window;
+import android.widget.AbsListView;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -33,36 +34,50 @@ import android.widget.PopupWindow;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.lang.ref.WeakReference;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.regex.Pattern;
+import java.util.function.Predicate;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.ResourceType;
 import app.morphe.extension.shared.ResourceUtils;
+import app.morphe.extension.shared.StringRef;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.patches.components.BufferAsciiStrings;
 import app.morphe.extension.shared.theme.ThemeUtils;
 import app.morphe.extension.shared.ui.Dim;
 import app.morphe.extension.youtube.patches.AddToQueuePatch;
+import app.morphe.extension.youtube.patches.FeedVideoActionsPatch;
+import app.morphe.extension.youtube.patches.LocalQueuePatch;
 import app.morphe.extension.youtube.patches.PictureinPictureButtonPatch;
+import app.morphe.extension.youtube.patches.PostImageDownloadPatch;
+import app.morphe.extension.youtube.patches.PostTranslatePatch;
 import app.morphe.extension.youtube.patches.SaveToWatchLaterPatch;
+import app.morphe.extension.youtube.patches.VideoDelayPatch;
 import app.morphe.extension.youtube.patches.VideoInformation;
 import app.morphe.extension.youtube.patches.components.PlayerFlyoutMenuComponentsFilter;
+import app.morphe.extension.youtube.patches.playback.speed.ShortsPlaybackSpeedFlyoutPatch;
 import app.morphe.extension.youtube.patches.utils.requests.ChannelIdRequest;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.EngagementPanel;
-import app.morphe.extension.youtube.shared.PlayerType;
 import app.morphe.extension.youtube.shared.ShortsPlayerState;
+import app.morphe.extension.youtube.videoplayer.ExportDownloadButton;
 import app.morphe.extension.youtube.videoplayer.PictureinPictureButton;
 import app.morphe.extension.youtube.videoplayer.SaveToWatchLaterButton;
+import app.morphe.extension.youtube.videoplayer.ShortsDownloadButton;
+import app.morphe.extension.youtube.videoplayer.VideoDelayDialogButton;
 import app.morphe.extension.youtube.whitelist.ChannelWhitelist;
 
 @SuppressWarnings("unused")
@@ -80,6 +95,19 @@ public final class FlyoutUtils {
             LinearLayout menuContainer,
             int adjustedIndex,
             @Nullable PopupWindow popupWindow
+    ) {}
+
+    /**
+     * Data a flyout button needs before it can be used. Until it is loaded, the button is disabled
+     * and shows a loading text instead of its own.
+     *
+     * @param resource Loads in the background.
+     * @param onLoaded Called on the main thread once the resource is loaded, with the text view of the button.
+     *                 Returns if the button can be used.
+     */
+    public record FlyoutButtonResource(
+            Future<?> resource,
+            Predicate<TextView> onLoaded
     ) {}
 
     /**
@@ -105,11 +133,16 @@ public final class FlyoutUtils {
          */
         @Nullable
         private final PopupWindow popupWindow;
+        /**
+         * Width that the app gave to the menu before the items were injected, or 0 if it's not known.
+         */
+        private final int appMenuWidth;
 
         InjectedItemsScrollView(Context context, ViewGroup menuContainer, @Nullable PopupWindow popupWindow) {
             super(context);
             this.menuContainer = menuContainer;
             this.popupWindow = popupWindow;
+            appMenuWidth = menuContainer.getWidth();
 
             setVerticalScrollBarEnabled(false);
 
@@ -218,13 +251,16 @@ public final class FlyoutUtils {
 
             if (popupWindow != null) {
                 // A popup window is as wide as the widest item of the menu, up to most of the window width,
-                // so the injected items are not made wider than the minimum width that the app gives to the menu,
+                // so the injected items are not made wider than the width that the app gave to the menu,
                 // and their long texts wrap as in the items of the app.
-                final int menuWidth = menuContainer.getMinimumWidth()
-                        - menuContainer.getPaddingLeft() - menuContainer.getPaddingRight();
+                // The injected items take all of that width, otherwise the menu is made narrower
+                // than the app chose for its items, and their texts are cut.
+                final int paddings = menuContainer.getPaddingLeft() + menuContainer.getPaddingRight();
+                final int menuWidth = Math.max(menuContainer.getMinimumWidth(), appMenuWidth) - paddings;
                 if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.AT_MOST
                         && menuWidth > 0 && menuWidth < MeasureSpec.getSize(widthMeasureSpec)) {
-                    widthMeasureSpec = MeasureSpec.makeMeasureSpec(menuWidth, MeasureSpec.AT_MOST);
+                    widthMeasureSpec = MeasureSpec.makeMeasureSpec(menuWidth,
+                            appMenuWidth > 0 ? MeasureSpec.EXACTLY : MeasureSpec.AT_MOST);
                 }
 
                 // A popup window keeps the space that the app chose for the menu when it was shown,
@@ -258,22 +294,19 @@ public final class FlyoutUtils {
     }
 
     private static final int VIDEO_ID_LENGTH = 11;
-    public static final int CHANNEL_ID_LENGTH = 24;
-    private static final byte[] POST_ID_PREFIX_BYTES =
-            getAsciiBytes("post-comments-");
     private static final byte[] PLAYLIST_ID_PREFIX_BYTES =
             getAsciiBytes("playlist?list=");
-    private static final byte[] HEADER_DESCRIPTION_PLAYLIST_ID_PREFIX_BYTES =
-            getAsciiBytes("VL");
     private static final List<byte[]> VIDEO_ID_PREFIXES_BYTES = List.of(
             getAsciiBytes(".ytimg.com/vi/"),
             getAsciiBytes("youtube.com/watch?v=")
     );
-    private static final List<byte[]> KIDS_VIDEO_ELEMENTS_BYTES = List.of(
-            getAsciiBytes("video_metadata_carousel.e"),
-            getAsciiBytes("com.google.android.apps.youtube.kids"),
-            getAsciiBytes("https://www.youtube.com/myfamily/#mf-compare")
-    );
+    /**
+     * The icon names of the Save to playlist item, by preference.
+     * The item uses the icon of a playlist or of a bookmark, depending on the app version.
+     */
+    private static final String[] SAVE_TO_PLAYLIST_ICON_NAMES = {"PLAYLIST_ADD", "ADD_TO_PLAYLIST", "BOOKMARK", "SAVE"};
+    private static final Pattern APP_SAVE_BUTTON_PATTERN =
+            Pattern.compile("WATCH_LATER|" + String.join("|", SAVE_TO_PLAYLIST_ICON_NAMES));
     private static final List<byte[]> SHORTS_VIDEO_ELEMENT_BYTES = List.of(
             getAsciiBytes("history-shorts-shelf-item"),
             getAsciiBytes("shorts-shelf-item")
@@ -282,17 +315,6 @@ public final class FlyoutUtils {
             getAsciiBytes("horizontal_shelf.e"),
             getAsciiBytes("FEhistory")
     );
-    private static final List<byte[]> HEADER_DESCRIPTION_BYTES = List.of(
-            getAsciiBytes("page_header.e"),
-            getAsciiBytes("engagement-panel-page-headers-description")
-    );
-    private static final List<byte[]> LIST_ITEM_SHARE_BYTES = List.of(
-            getAsciiBytes("list_item.e"),
-            getAsciiBytes("yt_outline_experimental_share")
-    );
-
-    private static final Pattern COMMENT_ID_CLEANUP_PATTERN =
-            Pattern.compile("[^A-Za-z0-9_.-]");
 
     // 20.21 has no container, and its secondary views are direct children of the item.
     private static final List<Integer> SECONDARY_VIEW_IDS = List.of(
@@ -303,36 +325,65 @@ public final class FlyoutUtils {
     );
     private static final int ITEM_TEXT_ID = ResourceUtils.getIdentifier(
             ResourceType.ID, "list_item_text");
+    private static final StringRef LOADING_BUTTON_TEXT = StringRef.sfc("morphe_flyout_button_loading");
 
     private static final List<WeakReference<TextView>> customItemTextRefs = new ArrayList<>();
 
     private static String currentButtonName = "";
     private static int currentButtonIndex;
     private static final List<Pair<String, Integer>> visibleFlyoutButtons = new ArrayList<>();
+    /**
+     * Text of the visible flyout buttons, by their name, to find the views of the buttons in the menu.
+     */
+    private static final Map<String, String> visibleFlyoutButtonTexts = new HashMap<>();
+    /**
+     * If the app menu has a save item, also if the item is hidden by a Morphe setting.
+     */
+    private static boolean flyoutHasAppSaveButton;
+    /**
+     * Injected save item. The app menu can bind its items after the injected items are added.
+     */
+    private static WeakReference<View> injectedSaveButtonRef = new WeakReference<>(null);
 
     private static WeakReference<View> senderViewRef = new WeakReference<>(null);
 
-    private static final Handler flyoutVisibilityHandler = new Handler(Looper.getMainLooper());
-    private static boolean flyoutVisibilityHandlerRunning;
-    private static final Handler flyoutIdsResetHandler = new Handler(Looper.getMainLooper());
-    private static boolean flyoutIdsResetHandlerRunning;
 
+    /**
+     * If the elements were added to the open menu. Menus opened on top of it stay as they are.
+     */
+    private static boolean flyoutElementsAdded;
     private static Dialog flyoutDialog;
     private static PopupWindow flyoutPopupWindow;
     private static String flyoutVideoId = "";
     private static String flyoutPlaylistId = "";
-    private static String flyoutCommentId = "";
-    private static String flyoutPostId = "";
-    private static String flyoutChannelId = "";
-    private static String flyoutChannelName = "";
-    private static final List<String> commentsPanelNames = List.of(
-            "comment-item-section",
-            "shorts-comments-panel"
-    );
+    /**
+     * The buffer of the open menu, if the menu has one.
+     */
+    @Nullable
+    private static byte[] flyoutBuffer;
 
-    private static boolean videoMarkedAsForKids;
     private static boolean isMyTabHistoryFlyout;
     private static boolean isShortFlyout;
+    /**
+     * If the open menu is the menu of the Shorts player, which has another layout
+     * and only gets the items that apply to the playing Short.
+     */
+    private static boolean isShortsPlayerFlyout;
+
+    /**
+     * Items of the menu of the Shorts player, to tell it apart from the other
+     * bottom sheets opened in the Shorts player, such as the share sheet.
+     */
+    private static final List<String> SHORTS_PLAYER_MENU_BUTTONS = List.of(
+            "ALIGN_LEFT", // Description.
+            "NERD_STATS", // Stats for nerds.
+            "FLAG",       // Report.
+            "FEEDBACK"    // Send feedback.
+    );
+    /**
+     * Channel of the video of the open menu. It loads in the background, so the menu never waits for it.
+     */
+    @Nullable
     private static ChannelIdRequest flyoutChannelIdRequest;
 
     public static byte[] getAsciiBytes(String string) {
@@ -347,50 +398,67 @@ public final class FlyoutUtils {
         return flyoutPlaylistId;
     }
 
-    public static String getFlyoutCommentId() {
-        return flyoutCommentId;
-    }
-
-    public static String getFlyoutPostId() {
-        return flyoutPostId;
-    }
-
-    public static String getFlyoutChannelId() {
-        return flyoutChannelId;
-    }
-
-    public static String getFlyoutChannelName() {
-        return flyoutChannelName;
-    }
-
-    public static void resetFlyoutPostId() {
-        flyoutPostId = "";
-    }
-
-    public static void resetFlyoutCommentId() {
-        flyoutCommentId = "";
-    }
-
     /**
-     * Injection point.
-     * Detect specific elements for videos marked as for kids, displayed
-     * via the video player's comments button.
+     * Some menus, such as the menus of the downloads list, have no description to find
+     * the video by. Their buffer is of a single video, so its first thumbnail is of that video.
+     *
+     * @return The video of the first thumbnail of the open menu, or an empty string if there is none.
      */
-    public static byte[] onCommentsLoaded(byte[] bytes) {
-        List<Integer> kidsVideoElementsBytesIndexes = byteIndexesOf(bytes, KIDS_VIDEO_ELEMENTS_BYTES);
-        if (!kidsVideoElementsBytesIndexes.isEmpty() &&
-                kidsVideoElementsBytesIndexes.size() == KIDS_VIDEO_ELEMENTS_BYTES.size() - 1) {
-            videoMarkedAsForKids = true;
+    public static String getFlyoutThumbnailVideoId() {
+        byte[] buffer = flyoutBuffer;
+        if (buffer == null) {
+            return "";
         }
 
-        return bytes;
+        byte[] prefix = VIDEO_ID_PREFIXES_BYTES.get(0);
+        final int index = byteIndexOf(buffer, prefix);
+        final int videoIdStart = index + prefix.length;
+        if (index < 0 || videoIdStart + VIDEO_ID_LENGTH > buffer.length) {
+            return "";
+        }
+        return new String(buffer, videoIdStart, VIDEO_ID_LENGTH, StandardCharsets.US_ASCII);
+    }
+
+    public static boolean hasVisibleFlyoutButton(String buttonName) {
+        for (Pair<String, Integer> button : visibleFlyoutButtons) {
+            if (button.first.equals(buttonName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
-     * Injection point.
+     * @return The channel request of the video of the open menu, or null if the menu has no video,
+     *         such as the player settings.
      */
-    public static void resetVideoMarkedAsForKids() {
-        videoMarkedAsForKids = false;
+    @Nullable
+    public static ChannelIdRequest getFlyoutChannelIdRequest() {
+        // The menus of the full history list are not litho elements, and the menu
+        // of the Shorts player belongs to the playing Short, so their request starts here.
+        if (flyoutChannelIdRequest == null) {
+            final String videoId = isShortsPlayerFlyout && flyoutVideoId.isEmpty()
+                    ? VideoInformation.getVideoId()
+                    : flyoutVideoId;
+            if (!videoId.isEmpty()) {
+                flyoutChannelIdRequest = ChannelIdRequest.fetchRequestIfNeeded(videoId);
+            }
+        }
+        return flyoutChannelIdRequest;
+    }
+
+    /**
+     * @return The channel name of the video of the open menu, or an empty string if it is not loaded yet.
+     */
+    public static String getFlyoutChannelName() {
+        if (flyoutChannelIdRequest != null && flyoutChannelIdRequest.fetchIsDone()) {
+            // The request is done, so this does not wait.
+            Pair<String, String> channelInfo = flyoutChannelIdRequest.getChannelInfo();
+            if (channelInfo != null) {
+                return channelInfo.first;
+            }
+        }
+        return "";
     }
 
     /**
@@ -400,9 +468,13 @@ public final class FlyoutUtils {
         if (dialog == null) {
             return;
         }
+        FeedVideoActionsPatch.onFlyoutCreated();
         flyoutDialog = dialog;
 
-        runFlyoutVisibilityHandler();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            addFlyoutElementsWhenShown(dialog, window.getDecorView());
+        }
     }
 
     /**
@@ -412,9 +484,16 @@ public final class FlyoutUtils {
         if (popupWindow == null) {
             return;
         }
+        FeedVideoActionsPatch.onFlyoutCreated();
         flyoutPopupWindow = popupWindow;
 
-        runFlyoutVisibilityHandler();
+        // The app can set the content view after this call, in the same method that shows the popup.
+        Utils.runOnMainThreadDelayed(() -> {
+            View contentView = popupWindow.getContentView();
+            if (contentView != null) {
+                addFlyoutElementsWhenShown(popupWindow, contentView);
+            }
+        }, 0);
     }
 
     public static void dismissFlyout() {
@@ -428,96 +507,63 @@ public final class FlyoutUtils {
         }
     }
 
-    private static void runFlyoutVisibilityHandler() {
-        if (flyoutVisibilityHandlerRunning) {
-            return;
-        }
-        flyoutVisibilityHandlerRunning = true;
+    /**
+     * The menu is not shown yet when it is created. The show and dismiss listeners of the menu
+     * are used by the app, while a view can have any number of attach listeners.
+     *
+     * @param flyoutView View that is attached to the window while the menu is open.
+     */
+    private static void addFlyoutElementsWhenShown(Object flyoutPanel, View flyoutView) {
+        Runnable addElements = () -> {
+            if (!flyoutElementsAdded) {
+                flyoutElementsAdded = true;
+                addFlyoutElements(flyoutPanel);
+                onFlyoutListBound(flyoutPanel);
+            }
+        };
 
-        flyoutVisibilityHandler.removeCallbacksAndMessages(null);
-        flyoutVisibilityHandler.post(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        if (flyoutDialog == null && flyoutPopupWindow == null) {
-                            flyoutVisibilityHandlerRunning = false;
-                            return;
-                        }
+        flyoutView.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(@NonNull View view) {
+                // After the current layout pass, that binds the items of the menu.
+                view.post(addElements);
+            }
 
-                        final boolean isDialogShowing =
-                                flyoutDialog != null && flyoutDialog.isShowing();
-                        final boolean isPopupWindowShowing =
-                                flyoutPopupWindow != null && flyoutPopupWindow.isShowing();
-                        final boolean blockFlyoutVisibilityHandler =
-                                isDialogShowing || isPopupWindowShowing;
-
-                        if (blockFlyoutVisibilityHandler) {
-                            final Object targetPanel = isDialogShowing ? flyoutDialog : flyoutPopupWindow;
-
-                            // give a delay to ensure the flyout animation is finished.
-                            Utils.runOnMainThreadDelayed(
-                                    () -> {
-                                        runFlyoutIdsResetHandler();
-                                        addFlyoutElements(targetPanel);
-                                        onFlyoutListBound(targetPanel);
-                                    },
-                                    30
-                            );
-                        } else {
-                            flyoutVisibilityHandler.postDelayed(this, 10);
-                        }
+            @Override
+            public void onViewDetachedFromWindow(@NonNull View view) {
+                view.removeOnAttachStateChangeListener(this);
+                // A dialog is still showing while its window is removed.
+                Utils.runOnMainThreadDelayed(() -> {
+                    if ((flyoutDialog == null || !flyoutDialog.isShowing())
+                            && (flyoutPopupWindow == null || !flyoutPopupWindow.isShowing())) {
+                        resetFlyoutIds();
                     }
-                }
-        );
+                }, 0);
+            }
+        });
+
+        // The app can show the menu before this call.
+        if (flyoutView.isAttachedToWindow()) {
+            flyoutView.post(addElements);
+        }
     }
 
-    private static void runFlyoutIdsResetHandler() {
-        if (flyoutIdsResetHandlerRunning) {
-            return;
+    private static void resetFlyoutIds() {
+        flyoutElementsAdded = false;
+        visibleFlyoutButtons.clear();
+        visibleFlyoutButtonTexts.clear();
+        flyoutHasAppSaveButton = false;
+        injectedSaveButtonRef = new WeakReference<>(null);
+        currentButtonIndex = 0;
+        flyoutVideoId = "";
+        flyoutPlaylistId = "";
+        flyoutBuffer = null;
+        if (flyoutChannelIdRequest != null) {
+            // The buttons waiting for the channel are gone with the menu.
+            flyoutChannelIdRequest.cancelIfNotDone();
+            flyoutChannelIdRequest = null;
         }
-        flyoutIdsResetHandlerRunning = true;
-
-        flyoutIdsResetHandler.removeCallbacksAndMessages(null);
-        flyoutIdsResetHandler.post(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        final boolean isDialogClosed =
-                                flyoutDialog == null || !flyoutDialog.isShowing();
-                        final boolean isPopupWindowClosed =
-                                flyoutPopupWindow == null || !flyoutPopupWindow.isShowing();
-                        final boolean blockFlyoutIdsResetHandler =
-                                isDialogClosed && isPopupWindowClosed;
-
-                        if (blockFlyoutIdsResetHandler) {
-                            // Give a delay to wait for the system sharing panel to be called.
-                            Utils.runOnMainThreadDelayed(
-                                    () -> {
-                                        visibleFlyoutButtons.clear();
-                                        currentButtonIndex = 0;
-                                        flyoutVideoId = "";
-                                        flyoutPlaylistId = "";
-                                        flyoutPostId = "";
-                                        flyoutChannelId = "";
-                                        flyoutChannelName = "";
-                                        isMyTabHistoryFlyout = false;
-                                        isShortFlyout = false;
-
-                                        flyoutVisibilityHandlerRunning = false;
-                                        flyoutIdsResetHandlerRunning = false;
-                                    },
-                                    // The delay used to prevent the system share sheet from failing to
-                                    // display, sometimes causes the injected buttons to appear in the
-                                    // YouTube share sheet. For this reason, the delay is set to zero
-                                    // when the setting to display the system share sheet is disabled.
-                                    Settings.OPEN_SYSTEM_SHARE_SHEET.get() ? 100 : 0
-                            );
-                        } else {
-                            flyoutIdsResetHandler.postDelayed(this, 10);
-                        }
-                    }
-                }
-        );
+        isShortsPlayerFlyout = false;
     }
 
     private static void addFlyoutElements(Object flyoutPanel) {
@@ -527,7 +573,79 @@ public final class FlyoutUtils {
         // onto whatever this call adds instead.
         customItemTextRefs.clear();
 
+        isShortsPlayerFlyout = isShortsPlayerMenu();
+        if (isShortsPlayerFlyout) {
+            nextButtonIndex = addShortsPlayerFlyoutButtons(flyoutPanel, nextButtonIndex);
+        } else {
+            nextButtonIndex = addVideoFlyoutButtons(flyoutPanel, nextButtonIndex);
+        }
+
+        if (nextButtonIndex > 0) {
+            addFlyoutMenuItem(flyoutPanel, null, null, null, nextButtonIndex, true, null);
+        }
+
+        // Reset 'topFlyoutMenuVisible' field, once the buttons have been injected into the player's
+        // overlay settings, to prevent them from also being added into nested menus.
+        PlayerFlyoutMenuComponentsFilter.resetTopFlyoutMenuVisible();
+    }
+
+    /**
+     * @return If the menu is the menu of the Shorts player, and not another bottom sheet
+     *         opened in the Shorts player, such as the share sheet or the menu of a comment.
+     */
+    private static boolean isShortsPlayerMenu() {
+        if (!ShortsPlayerState.isOpen()
+                || isShortFlyout
+                // Menus opened inside a panel, such as the menu of a comment.
+                || EngagementPanel.getLastOpenedPanelId() != null) {
+            return false;
+        }
+        for (Pair<String, Integer> button : visibleFlyoutButtons) {
+            if (SHORTS_PLAYER_MENU_BUTTONS.contains(button.first)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static int addShortsPlayerFlyoutButtons(Object flyoutPanel, int nextButtonIndex) {
+        if (ShortsPlaybackSpeedFlyoutPatch.isPatchIncluded()
+                && ShortsPlaybackSpeedFlyoutPatch.showFlyoutButton()) {
+            nextButtonIndex = ShortsPlaybackSpeedFlyoutPatch.addFlyoutButton(flyoutPanel, nextButtonIndex);
+        }
+
         final String flyoutVideoId = getFlyoutVideoId();
+        final String shortVideoId = flyoutVideoId.isEmpty() ? VideoInformation.getVideoId() : flyoutVideoId;
+
+        if (ShortsDownloadButton.isPatchIncluded()) {
+            nextButtonIndex = ShortsDownloadButton.addFlyoutButton(flyoutPanel, nextButtonIndex, shortVideoId);
+        }
+
+        nextButtonIndex = AiSListSubmitDialog.addFlyoutButton(flyoutPanel, nextButtonIndex, shortVideoId);
+
+        return ChannelWhitelist.addFlyoutButtons(flyoutPanel, nextButtonIndex, false);
+    }
+
+    private static int addVideoFlyoutButtons(Object flyoutPanel, int nextButtonIndex) {
+        final String flyoutVideoId = getFlyoutVideoId();
+
+        // Only added to the menus of posts with images.
+        if (PostImageDownloadPatch.ENABLED) {
+            nextButtonIndex = PostImageDownloadPatch.addFlyoutButton(
+                    flyoutPanel,
+                    nextButtonIndex,
+                    senderViewRef.get()
+            );
+        }
+
+        // Only added to the menus of posts with a text.
+        if (PostTranslatePatch.ENABLED) {
+            nextButtonIndex = PostTranslatePatch.addFlyoutButton(
+                    flyoutPanel,
+                    nextButtonIndex,
+                    senderViewRef.get()
+            );
+        }
 
         // region to show the following buttons only for specific flyout menus.
         final String allButtonsVideoId;
@@ -540,11 +658,13 @@ public final class FlyoutUtils {
         }
 
         if (!allButtonsVideoId.isEmpty()) {
-            nextButtonIndex = AddToQueuePatch.addFlyoutButton(
-                    flyoutPanel,
-                    nextButtonIndex,
-                    allButtonsVideoId
-            );
+            if (!(isMyTabHistoryFlyout && LocalQueuePatch.isEnabled())) {
+                nextButtonIndex = AddToQueuePatch.addFlyoutButton(
+                        flyoutPanel,
+                        nextButtonIndex,
+                        allButtonsVideoId
+                );
+            }
 
             nextButtonIndex = AiSListSubmitDialog.addFlyoutButton(
                     flyoutPanel,
@@ -571,9 +691,16 @@ public final class FlyoutUtils {
                     flyoutPanel,
                     nextButtonIndex,
                     flyoutVideoId,
-                    videoMarkedAsForKids,
-                    isShortFlyout,
                     PlayerFlyoutMenuComponentsFilter.getTopFlyoutMenuVisible()
+            );
+        }
+
+        // The menus of Shorts in the feed have no download option.
+        if (ShortsDownloadButton.isPatchIncluded() && isShortFlyout) {
+            nextButtonIndex = ShortsDownloadButton.addFlyoutButton(
+                    flyoutPanel,
+                    nextButtonIndex,
+                    flyoutVideoId
             );
         }
 
@@ -587,13 +714,23 @@ public final class FlyoutUtils {
             );
         }
 
-        if (nextButtonIndex > 0) {
-            addDivider(flyoutPanel, nextButtonIndex);
+        if (ExportDownloadButton.isPatchIncluded()) {
+            nextButtonIndex = ExportDownloadButton.addFlyoutButton(
+                    flyoutPanel,
+                    nextButtonIndex,
+                    allButtonsVideoId
+            );
         }
 
-        // Reset 'topFlyoutMenuVisible' field, once the buttons have been injected into the player's
-        // overlay settings, to prevent them from also being added into nested menus.
-        PlayerFlyoutMenuComponentsFilter.resetTopFlyoutMenuVisible();
+        if (VideoDelayPatch.isPatchIncluded()) {
+            nextButtonIndex = VideoDelayDialogButton.addFlyoutButton(
+                    flyoutPanel,
+                    nextButtonIndex,
+                    PlayerFlyoutMenuComponentsFilter.getTopFlyoutMenuVisible()
+            );
+        }
+
+        return nextButtonIndex;
     }
 
     /**
@@ -617,7 +754,6 @@ public final class FlyoutUtils {
 
             copyListItemTypeface(itemList);
             AddToQueuePatch.onListBound(itemList);
-
         } catch (Exception ex) {
             Logger.printException(() -> "onFlyoutListBound failure", ex);
         }
@@ -670,12 +806,45 @@ public final class FlyoutUtils {
             View.OnClickListener clickListener,
             int index
     ) {
-        return addFlyoutMenuItem(flyoutPanel, icon, text, clickListener, index, false);
+        return addFlyoutMenuItem(flyoutPanel, icon, text, clickListener, index, false, null);
     }
 
-    @SuppressWarnings("UnusedReturnValue")
-    private static int addDivider(Object flyoutPanel, int index) {
-        return addFlyoutMenuItem(flyoutPanel, null, null, null, index, true);
+    /**
+     * Adds a save item, which is removed if the app menu binds its own save item afterwards.
+     */
+    public static int addFlyoutSaveButton(
+            Object flyoutPanel,
+            Drawable icon,
+            String text,
+            View.OnClickListener clickListener,
+            int index
+    ) {
+        final int nextIndex = addFlyoutButton(flyoutPanel, icon, text, clickListener, index);
+        if (nextIndex >= 0 && !customItemTextRefs.isEmpty()) {
+            injectedSaveButtonRef = new WeakReference<>(customItemTextRefs.get(customItemTextRefs.size() - 1).get());
+        }
+        return nextIndex;
+    }
+
+    /**
+     * @return If the app menu has its own item to save the video. The name of the item does not depend on the language.
+     */
+    public static boolean hasAppSaveButton() {
+        return flyoutHasAppSaveButton;
+    }
+
+    /**
+     * @param buttonResource Data the button needs. The button is disabled until it is loaded.
+     */
+    public static int addFlyoutButton(
+            Object flyoutPanel,
+            Drawable icon,
+            String text,
+            View.OnClickListener clickListener,
+            int index,
+            FlyoutButtonResource buttonResource
+    ) {
+        return addFlyoutMenuItem(flyoutPanel, icon, text, clickListener, index, false, buttonResource);
     }
 
     private static int addFlyoutMenuItem(
@@ -684,7 +853,8 @@ public final class FlyoutUtils {
             @Nullable String text,
             @Nullable View.OnClickListener clickListener,
             int index,
-            boolean isDivider
+            boolean isDivider,
+            @Nullable FlyoutButtonResource buttonResource
     ) {
         try {
             FlyoutMenuInfo menuInfo = getFlyoutMenuInfo(flyoutPanel, 0);
@@ -738,7 +908,8 @@ public final class FlyoutUtils {
                                 currentInjectedItems.itemsContainer,
                                 icon,
                                 text,
-                                clickListener
+                                clickListener,
+                                buttonResource
                         )
                 );
             }
@@ -760,7 +931,50 @@ public final class FlyoutUtils {
      * Injection point.
      */
     public static void setCurrentButtonInfo(@Nullable Enum<?> buttonEnum, @Nullable Object buttonInfo) {
-        if (buttonEnum == null) {
+        // The popup menus give the text view of the button.
+        setCurrentButtonInfo(buttonEnum, buttonInfo,
+                buttonInfo instanceof TextView textView ? textView.getText() : null);
+    }
+
+    /**
+     * Injection point.
+     *
+     * @param buttonText The text of the button, if it's known.
+     */
+    public static void setCurrentButtonInfo(@Nullable Enum<?> buttonEnum, @Nullable Object buttonInfo,
+                                            @Nullable CharSequence buttonText) {
+        // Before the checks below, as a save item hidden by a Morphe setting must not be replaced by the injected one.
+        if (buttonEnum != null && !flyoutHasAppSaveButton) {
+            String name = buttonEnum.name();
+            if (APP_SAVE_BUTTON_PATTERN.matcher(name).find() && !name.contains("REMOVE")) {
+                flyoutHasAppSaveButton = true;
+
+                View view = injectedSaveButtonRef.get();
+                injectedSaveButtonRef = new WeakReference<>(null);
+                while (view != null && view.getParent() instanceof ViewGroup parent) {
+                    if (parent.getParent() instanceof InjectedItemsScrollView injectedItems) {
+                        Utils.hideViewByRemovingFromParentUnderCondition(true, view);
+                        if (parent.getChildCount() == 0) {
+                            // The divider is right after the injected items.
+                            ViewGroup menuContainer = injectedItems.menuContainer;
+                            Utils.hideViewByRemovingFromParentUnderCondition(true,
+                                    menuContainer.getChildAt(menuContainer.indexOfChild(injectedItems) + 1));
+                            Utils.hideViewByRemovingFromParentUnderCondition(true, injectedItems);
+                        }
+                        if (flyoutPopupWindow != null && flyoutPopupWindow.isShowing()) {
+                            flyoutPopupWindow.update();
+                        }
+                        break;
+                    }
+                    view = parent;
+                }
+            }
+        }
+
+        // The menu creates no row for an item without a text, such as an item hidden by a Morphe setting.
+        // It is not counted, so the index of every button matches its row.
+        // The popup menus always give the text, and keep the rows they hide.
+        if (buttonEnum == null || buttonText == null) {
             return;
         }
 
@@ -782,6 +996,18 @@ public final class FlyoutUtils {
         currentButtonIndex++;
 
         visibleFlyoutButtons.add(new Pair<>(currentButtonName, currentButtonIndex));
+        //noinspection SizeReplaceableByIsEmpty
+        if (buttonText != null && buttonText.length() > 0) {
+            visibleFlyoutButtonTexts.putIfAbsent(currentButtonName, buttonText.toString());
+        }
+    }
+
+    /**
+     * @return The text of the visible flyout button, or null if it's not known.
+     */
+    @Nullable
+    public static String getVisibleFlyoutButtonText(String buttonName) {
+        return visibleFlyoutButtonTexts.get(buttonName);
     }
 
     public static List<Pair<String, Integer>> getVisibleFlyoutButtons() {
@@ -805,12 +1031,7 @@ public final class FlyoutUtils {
 
         if (flyoutPanel instanceof PopupWindow checkedPopupWindow) {
             popupWindow = checkedPopupWindow;
-            if (checkedPopupWindow.getContentView() instanceof FrameLayout frameLayout) {
-                if (frameLayout.getChildAt(0) instanceof ViewGroup viewGroup &&
-                        viewGroup.getChildAt(0) instanceof LinearLayout checkedMenuContainer) {
-                    menuContainer = checkedMenuContainer;
-                }
-            }
+            menuContainer = getPopupMenuContainer(checkedPopupWindow.getContentView());
         } else if (flyoutPanel instanceof Dialog checkedDialog) {
             Window window = checkedDialog.getWindow();
             if (window != null) {
@@ -835,10 +1056,70 @@ public final class FlyoutUtils {
         }
 
         if (menuContainer == null) {
-            return null;
+            return isShortsPlayerFlyout
+                    ? getShortsPlayerMenuInfo(flyoutPanel, popupWindow)
+                    : null;
         }
 
         return new FlyoutMenuInfo(menuContainer, adjustedIndex, popupWindow);
+    }
+
+    /**
+     * The menu container of the Shorts player menu is the vertical layout that holds the list of the menu.
+     * The items are injected above the list, so after the bottom sheet handle.
+     */
+    @Nullable
+    private static FlyoutMenuInfo getShortsPlayerMenuInfo(Object flyoutPanel, @Nullable PopupWindow popupWindow) {
+        View root = getFlyoutRootView(flyoutPanel);
+        if (root instanceof ViewGroup rootGroup) {
+            View child = Utils.getChildView(rootGroup, true,
+                    view -> view instanceof RecyclerView || view instanceof AbsListView);
+            ViewParent parent = child == null ? null : child.getParent();
+            while (parent instanceof ViewGroup parentGroup && child != root) {
+                if (parentGroup instanceof LinearLayout linearLayout
+                        && linearLayout.getOrientation() == LinearLayout.VERTICAL) {
+                    return new FlyoutMenuInfo(linearLayout, linearLayout.indexOfChild(child), popupWindow);
+                }
+                child = parentGroup;
+                parent = parentGroup.getParent();
+            }
+        }
+
+        Logger.printDebug(() -> "Shorts player menu container not found");
+        return null;
+    }
+
+    /**
+     * The menu container of a popup menu is the first LinearLayout found by following the first child
+     * of the content view. Depending on the app version, the device and A/B tests, the content view is:
+     * the container itself, a view that places the container next to its anchor (also wrapped
+     * in a frame on phones), or a frame that sizes the popup window to the container.
+     *
+     * @return The menu container, or null if the content view is not a popup menu.
+     */
+    @Nullable
+    private static LinearLayout getPopupMenuContainer(@Nullable View contentView) {
+        View view = contentView;
+        // The deepest container is in a frame, inside the view that places it.
+        for (int depth = 0; depth < 3 && view != null; depth++) {
+            if (view instanceof LinearLayout linearLayout) {
+                return linearLayout;
+            }
+            view = view instanceof ViewGroup viewGroup ? viewGroup.getChildAt(0) : null;
+        }
+        return null;
+    }
+
+    @Nullable
+    private static View getFlyoutRootView(Object flyoutPanel) {
+        if (flyoutPanel instanceof PopupWindow popupWindow) {
+            return popupWindow.getContentView();
+        }
+        if (flyoutPanel instanceof Dialog dialog) {
+            Window window = dialog.getWindow();
+            return window == null ? null : window.getDecorView();
+        }
+        return null;
     }
 
     @SuppressLint("ResourceType")
@@ -847,7 +1128,8 @@ public final class FlyoutUtils {
             ViewGroup parent,
             @Nullable Drawable icon,
             String text,
-            View.OnClickListener clickListener
+            View.OnClickListener clickListener,
+            @Nullable FlyoutButtonResource buttonResource
     ) {
         // Inflating the same layout the app uses for its own items keeps the row height,
         // paddings, font and icon size identical to them.
@@ -898,7 +1180,70 @@ public final class FlyoutUtils {
 
         customButton.setOnClickListener(clickListener);
 
+        if (buttonResource != null) {
+            Future<?> resource = buttonResource.resource();
+            if (resource.isDone()) {
+                setFlyoutButtonLoaded(customButton, textView, text, buttonResource);
+            } else {
+                // The button is shown right away, so the menu does not change its size while the user taps it,
+                // and the resource is waited for in the background.
+                setFlyoutButtonEnabled(customButton, false);
+                if (textView != null) {
+                    // The loading text can take fewer lines than the button text, so it replaces the button text
+                    // only once the button is laid out, and keeps the height of the button text.
+                    textView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                        @Override
+                        public boolean onPreDraw() {
+                            textView.getViewTreeObserver().removeOnPreDrawListener(this);
+                            if (resource.isDone()) {
+                                // Loaded before the first draw, so the button is drawn ready to use.
+                                setFlyoutButtonLoaded(customButton, textView, text, buttonResource);
+                            } else {
+                                textView.setMinHeight(textView.getHeight());
+                                textView.setText(LOADING_BUTTON_TEXT.toString());
+                            }
+                            return false; // Skips the frame drawn before this change.
+                        }
+                    });
+                }
+                Utils.runOnBackgroundThread(() -> {
+                    try {
+                        resource.get();
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    } catch (CancellationException ex) {
+                        return; // The menu was closed.
+                    } catch (ExecutionException ex) {
+                        // The button reads the failure from the resource itself.
+                    }
+                    Utils.runOnMainThread(() -> setFlyoutButtonLoaded(customButton, textView, text, buttonResource));
+                });
+            }
+        }
+
         return customButton;
+    }
+
+    /**
+     * Shows the button text again and enables the button if its resource can be used.
+     * Can run more than once for the same button.
+     */
+    private static void setFlyoutButtonLoaded(
+            View button,
+            @Nullable TextView textView,
+            String text,
+            FlyoutButtonResource buttonResource
+    ) {
+        if (textView != null) {
+            textView.setText(text);
+        }
+        setFlyoutButtonEnabled(button, buttonResource.onLoaded().test(textView));
+    }
+
+    private static void setFlyoutButtonEnabled(View button, boolean enabled) {
+        button.setEnabled(enabled);
+        button.setAlpha(enabled ? 1.0f : DISABLED_ALPHA);
     }
 
     public static View createFlyoutDivider(Context context) {
@@ -921,52 +1266,6 @@ public final class FlyoutUtils {
     /**
      * Injection point.
      */
-    public static void extractFlyoutIdFromLithoButton(Map<?, ?> map) {
-        try {
-            if ((PlayerType.getCurrent().isMaximizedOrFullscreen() || ShortsPlayerState.isOpen()) &&
-                    EngagementPanel.checkIdsInQueue(commentsPanelNames)) {
-                extractFlyoutIdFromMap(map);
-            }
-
-            final byte[] flyoutBuffer =
-                    getFlyoutBuffer(map.get("com.google.android.libraries.youtube.innertube.endpoint.tag"));
-            if (flyoutBuffer == null) {
-                return;
-            }
-            List<Integer> headerDescriptionBytesIndexes =
-                    byteIndexesOf(flyoutBuffer, HEADER_DESCRIPTION_BYTES);
-            if (!headerDescriptionBytesIndexes.isEmpty() &&
-                    headerDescriptionBytesIndexes.size() == HEADER_DESCRIPTION_BYTES.size()) {
-                if (byteIndexInStartRange(headerDescriptionBytesIndexes.get(0))) {
-                    // Buttons that do not open a flyout, such as the share button of community posts
-                    // and of the playlist page header. The buttons that open a flyout are also called
-                    // before the flyout, which then finds the ids with its sender view.
-                    senderViewRef = new WeakReference<>(null);
-                    setFlyoutPlaylistId(
-                            flyoutBuffer,
-                            HEADER_DESCRIPTION_PLAYLIST_ID_PREFIX_BYTES,
-                            false
-                    );
-                    // Reset the ids after the share button is pressed, to prevent unintended usage.
-                    Utils.runOnMainThreadDelayed(() -> {
-                        if ((flyoutDialog == null || !flyoutDialog.isShowing())
-                                && (flyoutPopupWindow == null || !flyoutPopupWindow.isShowing())) {
-                            flyoutPostId = "";
-                            flyoutPlaylistId = "";
-                            isMyTabHistoryFlyout = false;
-                            isShortFlyout = false;
-                        }
-                    }, 500);
-                }
-            }
-        } catch (Exception ex) {
-            Logger.printException(() -> "extractFlyoutIdFromLithoButton failure", ex);
-        }
-    }
-
-    /**
-     * Injection point.
-     */
     public static void extractFlyoutIdFromMap(Map<?, ?> map) {
         try {
             senderViewRef = new WeakReference<>(
@@ -975,6 +1274,7 @@ public final class FlyoutUtils {
             extractFlyoutIdFromObject(
                     map.get("com.google.android.libraries.youtube.innertube.endpoint.tag")
             );
+            FeedVideoActionsPatch.onFlyoutSender(senderViewRef.get());
         } catch (Exception ex) {
             Logger.printException(() -> "extractFlyoutIdFromMap failure", ex);
         }
@@ -988,14 +1288,21 @@ public final class FlyoutUtils {
                 ? null : bufferObject.getClass()));
 
         if (bufferObject instanceof FlyoutMenuVideoIdInterface videoIdInterface) {
+            isMyTabHistoryFlyout = false;
             String videoId = videoIdInterface.patch_getVideoId();
             if (videoId != null) {
+                // An empty typed ID must clear the previous menu's video as well.
                 flyoutVideoId = videoId;
+                flyoutPlaylistId = "";
+                isShortFlyout = false;
             }
             return;
         }
 
-        byte[] flyoutBuffer = getFlyoutBuffer(bufferObject);
+        byte[] flyoutBuffer = bufferObject instanceof ProtocolBufferFieldInterface bufferInterface
+                ? bufferInterface.patch_getBuffer()
+                : null;
+        FlyoutUtils.flyoutBuffer = flyoutBuffer;
         if (flyoutBuffer == null) {
             return;
         }
@@ -1004,35 +1311,17 @@ public final class FlyoutUtils {
             Logger.printDebug(() -> "Flyout buffer: " + new BufferAsciiStrings(flyoutBuffer).getStrings());
         }
 
-        // Check whether the buffer contains the specified IDs within a certain initial
-        // range of the buffer, to avoid matching with false positives when share
-        // button is called from a comment flyout.
-        List<Integer> listItemShareBytesIndexes = byteIndexesOf(flyoutBuffer, LIST_ITEM_SHARE_BYTES);
-        if (!listItemShareBytesIndexes.isEmpty() &&
-                listItemShareBytesIndexes.size() == LIST_ITEM_SHARE_BYTES.size()) {
-            if (byteIndexInStartRange(listItemShareBytesIndexes.get(0))) {
-                setFlyoutCommentId(flyoutBuffer);
-                return;
-            }
-        }
-
         List<Integer> horizontalShelfHistoryBytesIndexes = byteIndexesOf(flyoutBuffer, HORIZONTAL_SHELF_HISTORY_BYTES);
-        if (!horizontalShelfHistoryBytesIndexes.isEmpty() &&
-                horizontalShelfHistoryBytesIndexes.size() == HORIZONTAL_SHELF_HISTORY_BYTES.size()) {
-            if (byteIndexInStartRange(horizontalShelfHistoryBytesIndexes.get(0))) {
-                isMyTabHistoryFlyout = true;
-            }
-        }
+        isMyTabHistoryFlyout =
+                !horizontalShelfHistoryBytesIndexes.isEmpty() &&
+                        horizontalShelfHistoryBytesIndexes.size() == HORIZONTAL_SHELF_HISTORY_BYTES.size() &&
+                        horizontalShelfHistoryBytesIndexes.get(0) <= 30;
 
         // Check if Shorts flyout is triggered only in the feed or on channels.
         List<Integer> shortsVideoElementsBytesIndexes = byteIndexesOf(flyoutBuffer, SHORTS_VIDEO_ELEMENT_BYTES);
-        if (shortsVideoElementsBytesIndexes.size() == 1) {
-            isShortFlyout = true;
-        }
+        isShortFlyout = shortsVideoElementsBytesIndexes.size() == 1;
 
-        setCommunityPostId(flyoutBuffer);
-
-        setFlyoutPlaylistId(flyoutBuffer, PLAYLIST_ID_PREFIX_BYTES, true);
+        setFlyoutPlaylistId(flyoutBuffer);
 
         View senderView = senderViewRef.get();
         Logger.printDebug(() -> "Flyout sender view object: " + (senderView != null));
@@ -1075,40 +1364,15 @@ public final class FlyoutUtils {
 
                         // Since not every element (especially in shelf) in feed have
                         // a channelId, we'll use YT API to safely retrieve it.
+                        // The request is never waited for here, so the menu opens right away.
                         if (!flyoutVideoId.isEmpty()) {
-                            // Prevent a new request until the previous (if exists) is not done.
-                            if (flyoutChannelIdRequest != null && !flyoutChannelIdRequest.fetchIsDone()) {
-                                return;
-                            }
-
                             flyoutChannelIdRequest = ChannelIdRequest.fetchRequestIfNeeded(flyoutVideoId);
-
-                            // Unfortunately must block main thread to ensure channel name is set.
-                            Pair<String, String> remoteFlyoutChannelInfo = flyoutChannelIdRequest.getChannelInfo();
-                            if (remoteFlyoutChannelInfo != null) {
-                                String remoteFlyoutChannelName = remoteFlyoutChannelInfo.first;
-                                if (!TextUtils.isEmpty(remoteFlyoutChannelName)) {
-                                    flyoutChannelName = remoteFlyoutChannelName;
-                                }
-
-                                String remoteFlyoutChannelId = remoteFlyoutChannelInfo.second;
-                                if (!TextUtils.isEmpty(remoteFlyoutChannelId)) {
-                                    flyoutChannelId = remoteFlyoutChannelId;
-                                }
-                            }
                         }
                     }
                 }
                 parent = parent.getParent();
             }
         }
-    }
-
-    private static byte[] getFlyoutBuffer(@Nullable Object bufferObject) {
-        if (!(bufferObject instanceof ProtocolBufferFieldInterface bufferInterface)) {
-            return null;
-        }
-        return bufferInterface.patch_getBuffer();
     }
 
     public static void setFlyoutVideoId(byte[] buffer, String rawDescription) {
@@ -1196,75 +1460,17 @@ public final class FlyoutUtils {
         }
     }
 
-    /**
-     * Channel ids are always 24 characters long and start with "UC", and the remaining
-     * 22 characters are URL safe Base64.
-     *
-     * @param buffer The buffer to check.
-     * @param index  The start index of the "UC" prefix.
-     * @return If the buffer holds a valid channel id at the given index.
-     */
-    public static boolean isValidChannelId(byte[] buffer, int index) {
-        final int lastIndex = index + CHANNEL_ID_LENGTH;
-        if (index < 0 || lastIndex > buffer.length || !(buffer[index] == 'U' && buffer[index + 1] == 'C')) {
-            return false;
-        }
-
-        if ((index > 0 && isByteAlphanumeric(buffer[index - 1])) ||
-                (lastIndex < buffer.length && isByteAlphanumeric(buffer[lastIndex]))) {
-            return false;
-        }
-
-        for (int i = index + 2; i < lastIndex; i++) {
-            final byte b = buffer[i];
-            if (!isByteAlphanumeric(b) && b != '-' && b != '_') {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static void setCommunityPostId(byte[] flyoutBuffer) {
-        final int postIdIndex = byteIndexOf(flyoutBuffer, POST_ID_PREFIX_BYTES);
-        if (postIdIndex >= 0) {
-            final int postIdStartIndex = postIdIndex + POST_ID_PREFIX_BYTES.length;
-            int postIdEndIndex = postIdStartIndex;
-            while (postIdEndIndex < flyoutBuffer.length &&
-                    (isByteAlphanumeric(
-                            flyoutBuffer[postIdEndIndex]) ||
-                            flyoutBuffer[postIdEndIndex] == '-' ||
-                            flyoutBuffer[postIdEndIndex] == '_')) {
-                postIdEndIndex++;
-            }
-            final String postId = new String(
-                    flyoutBuffer,
-                    postIdStartIndex,
-                    postIdEndIndex - postIdStartIndex,
-                    StandardCharsets.US_ASCII
-            );
-            if (!postId.isEmpty()) {
-                flyoutPostId = postId;
-                Logger.printDebug(() -> "Flyout Post ID found: " + postId);
-            }
-        }
-    }
-
     @SuppressWarnings("ExtractMethodRecommender")
-    private static void setFlyoutPlaylistId(
-            byte[] flyoutBuffer,
-            byte[] playlistIdPrefix,
-            boolean truncateLastChar
-    ) {
-        final int index = byteIndexOf(flyoutBuffer, playlistIdPrefix);
+    private static void setFlyoutPlaylistId(byte[] flyoutBuffer) {
+        final int index = byteIndexOf(flyoutBuffer, PLAYLIST_ID_PREFIX_BYTES);
 
         if (index >= 0) {
-            final int playlistIdStart = index + playlistIdPrefix.length;
+            final int playlistIdStart = index + PLAYLIST_ID_PREFIX_BYTES.length;
 
             int playlistIdEnd = playlistIdStart;
             while (playlistIdEnd < flyoutBuffer.length) {
                 byte b = flyoutBuffer[playlistIdEnd];
-                if (!(isByteAlphanumeric(b) ||
+                if (!((b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') ||
                         b == '-' ||
                         b == '_')) {
                     break;
@@ -1274,10 +1480,7 @@ public final class FlyoutUtils {
             // "playlist?list=" always ends with a character extraneous to the
             // playlist ID, so verify that the current index of being
             // searched bytes does not belong to this element.
-            final int playlistLength =
-                    playlistIdEnd -
-                            playlistIdStart -
-                            (truncateLastChar ? 1 : 0);
+            final int playlistLength = playlistIdEnd - playlistIdStart - 1;
 
             if (playlistLength >= 18) {
                 flyoutPlaylistId = new String(
@@ -1290,86 +1493,6 @@ public final class FlyoutUtils {
                         flyoutPlaylistId
                 );
             }
-        }
-    }
-
-    private static void setFlyoutCommentId(byte[] buffer) {
-        try {
-            int bestStart = -1;
-            int bestEnd = -1;
-            int maxLen = 0;
-            int curr = 0;
-
-            final int bufferLength = buffer.length;
-            // Ensure the string is a base64 value and not a false-positive.
-            while (curr < bufferLength) {
-                final int start = curr;
-
-                while (curr < bufferLength) {
-                    final byte b = buffer[curr];
-                    final boolean isBase64 =
-                            (isByteAlphanumeric(b)) ||
-                                    b == '+' ||
-                                    b == '/' ||
-                                    b == '=' ||
-                                    b == '-' ||
-                                    b == '_';
-
-                    if (isBase64) {
-                        curr++;
-                    } else {
-                        break;
-                    }
-                }
-
-                final int len = curr - start;
-                if (len > maxLen) {
-                    maxLen = len;
-                    bestStart = start;
-                    bestEnd = curr;
-                }
-                if (len == 0) {
-                    curr++;
-                }
-            }
-            if (maxLen < 150) {
-                Logger.printException(() -> "setCommentId failure: No base64 string found!");
-                return;
-            }
-
-            // Get the Comment ID from the fetched base64 decoded buffer.
-            byte[] byteBase64 = Base64.decode(
-                    Arrays.copyOfRange(buffer, bestStart, bestEnd), Base64.URL_SAFE
-            );
-            final int base64VideoIdIndex = byteIndexOf(
-                    byteBase64,
-                    VideoInformation.getVideoId().getBytes(StandardCharsets.UTF_8)
-            );
-            if (base64VideoIdIndex < 0) {
-                Logger.printException(() -> "setCommentId failure: No videoId found in the decoded base64 string!");
-                return;
-            }
-
-            byte[] rawCommentId = Arrays.copyOfRange(byteBase64, 0, base64VideoIdIndex);
-            String cleanedCommentId = COMMENT_ID_CLEANUP_PATTERN.matcher(
-                            new String(rawCommentId, StandardCharsets.UTF_8)
-                    ).replaceAll(" ")
-                    .trim();
-
-            final int spaceIndex = cleanedCommentId.indexOf(' ');
-            flyoutCommentId =
-                    spaceIndex == -1
-                            ? cleanedCommentId
-                            : cleanedCommentId.substring(0, spaceIndex);
-            Logger.printDebug(() -> "Flyout Comment ID found: " +
-                    flyoutCommentId
-            );
-
-            // Reset 'flyoutCommentId' immediately after its fetching (when the comment
-            // share flyout button is pressed), to prevent unintended usage.
-            Utils.runOnMainThreadDelayed(() -> flyoutCommentId = "", 500);
-        } catch (Exception ex) {
-            Logger.printException(() -> "setCommentId failure", ex);
         }
     }
 
@@ -1438,13 +1561,5 @@ public final class FlyoutUtils {
             }
         }
         return indices;
-    }
-
-    private static boolean byteIndexInStartRange(int index) {
-        return index >= 0 && index <= 30;
-    }
-
-    private static boolean isByteAlphanumeric(byte b) {
-        return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9');
     }
 }

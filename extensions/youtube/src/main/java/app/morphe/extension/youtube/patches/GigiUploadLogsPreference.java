@@ -7,6 +7,12 @@ import android.util.AttributeSet;
 /** GigiMorphs: "Upload logs now" button. */
 @SuppressWarnings({"unused", "deprecation"})
 public class GigiUploadLogsPreference extends Preference {
+    static {
+        // Make sure the log settings are registered before the settings screen binds them.
+        // Otherwise opening the screen shows "Preference key has no setting" and they don't save.
+        Object unused = GigiLogUploadPatch.AUTO_CRASH;
+    }
+
     {
         setOnPreferenceClickListener(pref -> {
             GigiLogUploadPatch.uploadNow();

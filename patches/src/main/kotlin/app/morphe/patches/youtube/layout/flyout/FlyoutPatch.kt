@@ -13,23 +13,20 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.fieldAccess
-import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.mutableClassDefBy
+import app.morphe.patcher.patch.patch
 import app.morphe.patcher.string
+import app.morphe.patcher.util.cloneParameters
+import app.morphe.patcher.util.findFreeRegister
+import app.morphe.patcher.util.getReference
+import app.morphe.patcher.util.numberOfParameterRegisters
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
-import app.morphe.patches.shared.misc.litho.filter.addLithoFilter
-import app.morphe.patches.shared.misc.proto.hookElement
 import app.morphe.patches.youtube.layout.hide.general.ContextualMenuItemBuilderFingerprint
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
-import app.morphe.patches.youtube.misc.litho.filter.lithoFilterPatch
 import app.morphe.patches.youtube.misc.proto.elementProtoParserHookPatch
-import app.morphe.patches.youtube.shared.hookVideoStarted
 import app.morphe.patches.youtube.shared.startVideoInformerPatch
 import app.morphe.patches.youtube.video.information.videoInformationPatch
-import app.morphe.util.cloneParameters
-import app.morphe.util.findFreeRegister
 import app.morphe.util.findInstructionIndicesReversedOrThrow
-import app.morphe.util.getReference
-import app.morphe.util.numberOfParameterRegisters
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
@@ -49,12 +46,11 @@ private const val EXTENSION_FLYOUT_MENU_VIDEO_ID_INTERFACE =
 private const val EXTENSION_PROTOCOL_BUFFER_INTERFACE =
     $$"Lapp/morphe/extension/youtube/patches/utils/FlyoutUtils$ProtocolBufferFieldInterface;"
 
-val flyoutPatch = bytecodePatch(
+val flyoutPatch = patch(
     description = "Provides shared flyout menu hooks.",
 ) {
     dependsOn(
         sharedExtensionPatch,
-        lithoFilterPatch,
         startVideoInformerPatch,
         videoInformationPatch,
         elementProtoParserHookPatch,
@@ -63,7 +59,7 @@ val flyoutPatch = bytecodePatch(
     execute {
         // Add interface method to get protocol buffer.
         InteractiveStickerRendererGetEditViewFingerprint.let {
-            val bufferField = it.instructionMatches.last().getFieldAccessed()
+            val bufferField = it.instructionMatches.last().fieldReference
 
             mutableClassDefBy(bufferField.definingClass).apply {
                 interfaces.add(EXTENSION_PROTOCOL_BUFFER_INTERFACE)
@@ -104,7 +100,7 @@ val flyoutPatch = bytecodePatch(
                         location = MatchAfterWithin(2)
                     )
                 )
-            ).instructionMatches.last().getFieldAccessed()
+            ).instructionMatches.last().fieldReference
 
             mutableClassDefBy(messageType).apply {
                 interfaces.add(EXTENSION_FLYOUT_MENU_VIDEO_ID_INTERFACE)
@@ -155,18 +151,6 @@ val flyoutPatch = bytecodePatch(
                     "extractFlyoutIdFromMap(Ljava/util/Map;)V"
         )
 
-        OnClickLithoButtonBufferObjectFingerprint.let {
-            val match = it.instructionMatches[3]
-            val index = match.index
-            val register = match.getInstruction<FiveRegisterInstruction>().registerC
-
-            it.method.addInstruction(
-                index + 1,
-                "invoke-static { v$register }, $EXTENSION_UTILS_CLASS->" +
-                        "extractFlyoutIdFromLithoButton(Ljava/util/Map;)V"
-            )
-        }
-
         FullHistoryFlyoutBufferObjectFingerprint.let {
             val match = it.instructionMatches[2]
             val index = match.index
@@ -204,13 +188,6 @@ val flyoutPatch = bytecodePatch(
             }
         }
 
-        hookVideoStarted("$EXTENSION_UTILS_CLASS->resetVideoMarkedAsForKids()V")
-
-        hookElement("$EXTENSION_UTILS_CLASS->onCommentsLoaded")
-        addLithoFilter(
-            "Lapp/morphe/extension/youtube/patches/components/ChannelPageFlyoutFilter;"
-        )
-
         // Track and initialize flyout menu buttons generically.
         FeedFlyoutButtonsInitializerFingerprint.clearMatch() // Shared fingerprint.
         FeedFlyoutButtonsInitializerFingerprint.let { mainFingerprint ->
@@ -221,16 +198,17 @@ val flyoutPatch = bytecodePatch(
             val enumIntField = mainFingerprintMatches[6].getInstruction<ReferenceInstruction>().reference
             val enumMethodCall = mainFingerprintMatches[7].getInstruction<ReferenceInstruction>().reference
             val charCheckRegister = mainFingerprintMatches.last().getInstruction<OneRegisterInstruction>().registerA
+            val buttonTextRegister = mainFingerprintMatches[3].getInstruction<OneRegisterInstruction>().registerA
 
             mainFingerprint.method.apply {
-                val freeRegister = findFreeRegister(charCheckIndex, charCheckRegister, enumMethodRegister)
+                val freeRegister = findFreeRegister(charCheckIndex, charCheckRegister, enumMethodRegister, buttonTextRegister)
                 addInstructions(
                     charCheckIndex,
                     """
                         iget v$freeRegister, v$enumMethodRegister, $enumIntField
                         invoke-static { v$freeRegister }, $enumMethodCall
                         move-result-object v$freeRegister
-                        invoke-static { v$freeRegister, v$charCheckRegister }, $EXTENSION_UTILS_CLASS->setCurrentButtonInfo(Ljava/lang/Enum;Ljava/lang/Object;)V
+                        invoke-static { v$freeRegister, v$charCheckRegister, v$buttonTextRegister }, $EXTENSION_UTILS_CLASS->setCurrentButtonInfo(Ljava/lang/Enum;Ljava/lang/Object;Ljava/lang/CharSequence;)V
                     """
                 )
             }

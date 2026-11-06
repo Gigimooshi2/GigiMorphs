@@ -23,7 +23,6 @@ import android.view.ViewTreeObserver;
 import android.widget.LinearLayout;
 
 import java.util.List;
-import java.util.Map;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.ResourceType;
@@ -35,19 +34,20 @@ import app.morphe.extension.shared.patches.components.ByteArrayFilterGroupList;
 import app.morphe.extension.shared.patches.components.ContextInterface;
 import app.morphe.extension.shared.patches.components.Filter;
 import app.morphe.extension.shared.patches.components.StringFilterGroup;
-import app.morphe.extension.shared.ui.Dim;
+import app.morphe.extension.youtube.innertube.NextResponseOuterClass.ChannelGuidelinesStateEntityPayload;
 import app.morphe.extension.youtube.innertube.NextResponseOuterClass.NewElement;
 import app.morphe.extension.youtube.patches.VersionCheckPatch;
+import app.morphe.extension.youtube.patches.utils.FeedVideoCardsPatch;
 import app.morphe.extension.youtube.settings.Settings;
-import app.morphe.extension.youtube.shared.EngagementPanel;
 import app.morphe.extension.youtube.shared.PlayerType;
 
 @SuppressWarnings("unused")
 public class CommentsFilter extends Filter {
 
-    private static final String ELEMENTS_SENDER_VIEW =
-            "com.google.android.libraries.youtube.rendering.elements.sender_view";
-
+    /**
+     * Type of the entity that tells if the channel guidelines must be acknowledged before commenting.
+     */
+    private static final int CHANNEL_GUIDELINES_STATE_ENTITY_TYPE = 263;
     private static final String CHIP_BAR_PATH_PREFIX = "chip_bar.e";
     private static final String COMMENT_COMPOSER_PATH = "comment_composer.e";
     private static final String COMMENT_PATH = "|comment.e";
@@ -70,6 +70,7 @@ public class CommentsFilter extends Filter {
     private final StringFilterGroup commentsFilterBar;
     private final StringFilterGroup dislikeButton;
     private final StringFilterGroup emojiButton;
+    private final StringFilterGroup gifsAndImages;
     private final StringFilterGroup commentCardsIndicator;
     private final StringFilterGroup menuButton;
     private final StringFilterGroup translateButton;
@@ -136,6 +137,11 @@ public class CommentsFilter extends Filter {
                 CHIP_BAR_PATH_PREFIX
         );
 
+        var commentsZeroState = new StringFilterGroup(
+                Settings.HIDE_COMMENTS_ZERO_STATE,
+                "comment_zero_state"
+        );
+
         var communityGuidelines = new StringFilterGroup(
                 Settings.HIDE_COMMENTS_COMMUNITY_GUIDELINES,
                 "community_guidelines",
@@ -156,6 +162,16 @@ public class CommentsFilter extends Filter {
         menuButton = new StringFilterGroup(
                 Settings.HIDE_COMMENTS_MENU_BUTTON,
                 "overflow_button.e"
+        );
+
+        var gifButton = new StringFilterGroup(
+                Settings.HIDE_COMMENTS_GIF_BUTTON,
+                "composer_gif_button.e"
+        );
+
+        gifsAndImages = new StringFilterGroup(
+                Settings.HIDE_COMMENTS_GIFS_AND_IMAGES,
+                "comment_image_attachment.e"
         );
 
         var giftAnimationAndCards = new StringFilterGroup(
@@ -209,10 +225,13 @@ public class CommentsFilter extends Filter {
                 commentsByMembers,
                 commentsContexts,
                 commentsFilterBar,
+                commentsZeroState,
                 communityGuidelines,
                 createAShortButton,
                 dislikeButton,
                 emojiButton,
+                gifButton,
+                gifsAndImages,
                 giftAnimationAndCards,
                 previewComment,
                 commentCardsIndicator,
@@ -261,6 +280,11 @@ public class CommentsFilter extends Filter {
             return Utils.contains(path, COMMENT_PATH);
         }
 
+        if (matchedGroup == gifsAndImages) {
+            // Only posted comments and replies, not the preview of an attachment in the composer.
+            return Utils.contains(path, COMMENT_PATH);
+        }
+
         if (matchedGroup == translateButton) {
             return accessibility.startsWith(TRANSLATE_BUTTON_ACCESSIBILITY_ID)
                     && Utils.contains(path, COMMENT_PATH);
@@ -272,10 +296,42 @@ public class CommentsFilter extends Filter {
 
         if (matchedGroup == commentCardsIndicator) {
             return Utils.contains(path, "carousel_header") &&
-                    Utils.endsWith(path, "|ContainerType|ContainerType|ContainerType|");
+                            // Old action buttons layout.
+                            (Utils.endsWith(path, "|ContainerType|ContainerType|ContainerType|")
+                            // New action buttons layout.
+                            || Utils.contains(path, "|dot_indicator.e"));
         }
 
         return true;
+    }
+
+    /**
+     * Injection point.
+     * <p>
+     * The channel guidelines and the Community Guidelines are shown in a sheet that must be
+     * acknowledged before the comment composer opens, as long as the state entity of the channel
+     * requires it. The state is changed as if they are acknowledged already, so the composer and
+     * the reply buttons open at once.
+     *
+     * @param entityType Field number of the payload in its mutation, the type of the entity.
+     */
+    public static byte[] hideGuidelinesSheet(int entityType, byte[] payload) {
+        if (entityType != CHANNEL_GUIDELINES_STATE_ENTITY_TYPE
+                || !Settings.HIDE_COMMENTS_COMMUNITY_GUIDELINES.get()) {
+            return payload;
+        }
+
+        try {
+            var state = ChannelGuidelinesStateEntityPayload.parseFrom(payload);
+            if (state.getShouldRequireViewerAck()) {
+                Logger.printDebug(() -> "Hiding guidelines sheet of: " + state.getKey());
+                return state.toBuilder().setShouldRequireViewerAck(false).build().toByteArray();
+            }
+        } catch (Exception ex) {
+            Logger.printException(() -> "hideGuidelinesSheet failure", ex);
+        }
+
+        return payload;
     }
 
     /**
@@ -422,9 +478,28 @@ public class CommentsFilter extends Filter {
     /**
      * Injection point.
      */
+    public static void hideLiveChatScrollToBottomButton(View view) {
+        if (Settings.HIDE_COMMENTS_LIVE_CHAT_SCROLL_TO_BOTTOM_BUTTON.get() && view != null) {
+            ViewGroup.LayoutParams lp = view.getLayoutParams();
+            if (lp != null) {
+                lp.width = 0;
+                lp.height = 0;
+                view.setLayoutParams(lp);
+            }
+
+            view.setVisibility(View.GONE);
+        }
+    }
+
+    /**
+     * Injection point.
+     */
     public static byte[] onCommentsLoaded(byte[] bytes) {
         try {
-            if (Settings.HIDE_COMMENTS_CAROUSEL.get() && !commentsCarouselFilterStrings.isEmpty()) {
+            // Every element is parsed here otherwise, on the main thread. The identifier of the carousel
+            // is also in the bytes of its element, see FeedVideoCardsPatch.getElementText().
+            if (Settings.HIDE_COMMENTS_CAROUSEL.get() && !commentsCarouselFilterStrings.isEmpty()
+                    && FeedVideoCardsPatch.getElementText(bytes).contains(VIDEO_METADATA_CAROUSEL_PATH)) {
                 var newElement = NewElement.parseFrom(bytes).toBuilder();
                 var identifier = newElement.getProperties().getIdentifierProperties().getIdentifier();
                 if (identifier != null && identifier.contains(VIDEO_METADATA_CAROUSEL_PATH)) {
@@ -512,28 +587,12 @@ public class CommentsFilter extends Filter {
                     ? spanned
                     : new SpannableString(original);
 
-            return newSpanUsingStylingOfAnotherSpan(originalSpanned, hiddenPreviewCommentCharSequence);
+            // Only the style of the entire comment is used, otherwise a timestamp of the comment
+            // is applied to the entire hidden text and tapping it seeks instead of opening the comments.
+            return newSpanUsingStylingOfAnotherSpan(originalSpanned, hiddenPreviewCommentCharSequence, true);
         } catch (Exception ex) {
             Logger.printException(() -> "onLithoTextLoaded failure", ex);
         }
         return original;
-    }
-
-    /**
-     * Injection point.
-     * Disable clickable timestamps for preview comments.
-     */
-    public static boolean onVideoIntentLoaded(Map<Object, Object> playbackStartDescriptorMap, String videoId) {
-        if (!Settings.HIDE_COMMENTS_PREVIEW_COMMENT.get()) {
-            return false;
-        }
-        if (!(playbackStartDescriptorMap.get(ELEMENTS_SENDER_VIEW) instanceof ViewGroup senderView)) {
-            return false;
-        }
-        final int height = senderView.getHeight();
-        boolean isTimestamp = height >= Dim.dp(40) && height <= Dim.dp(60);
-        return PlayerType.getCurrent().isMaximizedOrFullscreen() &&
-                EngagementPanel.getCurrentOpenedPanels().isEmpty() &&
-                isTimestamp;
     }
 }

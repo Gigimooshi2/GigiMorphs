@@ -15,6 +15,8 @@ import static app.morphe.extension.shared.StringRef.str;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.google.protobuf.InvalidProtocolBufferException;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -30,33 +32,40 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
-import app.morphe.extension.shared.innertube.ResponseContextOuterClass.*;
-import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.*;
+import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.PlayabilityStatus;
+import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.PlayerConfig;
+import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.PlayerGestureConfig;
+import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.PlayerResponse;
+import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.StreamingData;
 import app.morphe.extension.shared.innertube.ReelItemWatchResponseOuterClass.ReelItemWatchResponse;
+import app.morphe.extension.shared.innertube.utils.AuthUtils;
 import app.morphe.extension.shared.oauth2.requests.OAuth2Requester;
 import app.morphe.extension.shared.settings.BaseSettings;
 import app.morphe.extension.shared.settings.SharedYouTubeSettings;
 import app.morphe.extension.shared.spoof.ClientType;
-import app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch;
+import app.morphe.extension.shared.spoof.PreferredClientCheck;
 import app.morphe.extension.shared.spoof.js.JavaScriptEngineSupport;
 import app.morphe.extension.shared.spoof.js.JavaScriptManager;
 import app.morphe.extension.shared.spoof.potoken.PoTokenManager;
 
 /**
- * Video streaming data. Fetching is tied to the behavior YT uses,
- * where this class fetches the streams only when YT fetches.
+ * Video streaming data. Fetching starts when the app requests a video, so both requests run at the same time.
  * <p>
- * Effectively the cache expiration of these fetches is the same as the stock app,
- * since the stock app would not use expired streams and therefor
- * the extension replace stream hook is called only if YT
- * did use its own client streams.
+ * The app can also load a video with a request that is not seen, such as the Onesie request,
+ * or play a video again from a response it got earlier. Then the streams are fetched when the app builds
+ * the streams of the video, unless the streams fetched earlier are recent enough.
  */
 public class StreamingDataRequest {
 
-    public record StreamData(byte[] streamingData, @Nullable byte[] playerConfig, boolean hasAndroidMedia) {
+    /**
+     * @param client Client the streams are of.
+     */
+    public record StreamData(byte[] streamingData, @Nullable byte[] playerConfig, boolean hasAndroidMedia,
+                             ClientType client) {
     }
 
     private static volatile ClientType[] clientOrderToUse = ClientType.values();
@@ -108,6 +117,18 @@ public class StreamingDataRequest {
     private static final int MAX_MILLISECONDS_TO_WAIT_FOR_FETCH = 20 * 1000;
 
     /**
+     * How long fetched streams are given to the player of a video that is loaded again without a request
+     * that is seen. Streams expire some hours after they are fetched.
+     */
+    private static final long MAX_MILLISECONDS_TO_REUSE_STREAMS = 60 * 60 * 1000;
+
+    /**
+     * How long a fetch that found no streams is used for a video that is loaded again without a request
+     * that is seen. The app can build the streams of the same response more than once.
+     */
+    private static final long MAX_MILLISECONDS_TO_REUSE_FAILED_FETCH = 30 * 1000;
+
+    /**
      * Cache limit must be greater than the maximum number of videos open at once,
      * which theoretically is more than 4 (3 Shorts + one regular minimized video).
      * But instead use a much larger value, to handle if a video viewed a while ago
@@ -117,9 +138,36 @@ public class StreamingDataRequest {
     private static final Map<String, StreamingDataRequest> cache = Collections.synchronizedMap(
             Utils.createSizeRestrictedMap(50));
 
+    /**
+     * Client of the streams last given to the player.
+     * Several videos are fetched at once, such as the inline previews of the search results
+     * or the next track of the queue, so the last fetch to finish can be of another video.
+     */
     private static volatile ClientType lastSpoofedClientType;
-    private static volatile boolean fallbackWithTVDash;
-    private static volatile Map<String, String> lastPlayerHeaders = Collections.emptyMap();
+
+    /**
+     * Clients of the streams given to the player, by video id.
+     * The streams of another video can be given before the player is set up for a video,
+     * so the player chooses SABR from the client of that video and not from the last one.
+     */
+    private static final Map<String, ClientType> playerClients = Collections.synchronizedMap(
+            Utils.createSizeRestrictedMap(50));
+
+    /**
+     * If the last TV SABR response built on the thread is of a live stream, which is fetched again with TV DASH.
+     * A fetch runs on a single thread, and other fetches running at the same time must not see this.
+     */
+    private static final ThreadLocal<Boolean> fallbackWithTVDashOnThread = ThreadLocal.withInitial(() -> false);
+
+    /**
+     * Headers of the latest InnerTube request of the app, which name the account it uses.
+     */
+    private static volatile Map<String, String> lastAppHeaders = Collections.emptyMap();
+
+    /**
+     * Number of times a media response asked the player to load the player response again.
+     */
+    private static final AtomicInteger playerResponseReloadCount = new AtomicInteger();
 
     /**
      * Used only for stats for nerds to show VR sign-in was used.
@@ -144,8 +192,33 @@ public class StreamingDataRequest {
         return client != null && client.requireSABR;
     }
 
+    /**
+     * @param client Client of the streams given to the player for the video,
+     *               or null if the player uses the streams of the app.
+     */
+    public static void setPlayerClient(String videoId, @Nullable ClientType client) {
+        lastSpoofedClientType = client;
+        if (client == null) {
+            playerClients.remove(videoId);
+        } else {
+            playerClients.put(videoId, client);
+        }
+    }
+
+    /**
+     * @return If the streams given to the player for the video are SABR streams.
+     */
+    public static boolean playerClientUsesSABR(@Nullable String videoId) {
+        ClientType client = videoId == null ? null : playerClients.get(videoId);
+        return client != null && client.requireSABR;
+    }
+
     private final String videoId;
-    private final boolean isInline;
+    @Nullable
+    private final String authorization;
+    private final ClientType[] clientOrder;
+    private final long fetchStartTime = System.currentTimeMillis();
+    private final int playerResponseReloadCountAtFetch = playerResponseReloadCount.get();
 
     private final Future<StreamData> future;
 
@@ -187,39 +260,134 @@ public class StreamingDataRequest {
         return videoId;
     }
 
-    private StreamingDataRequest(String videoId, boolean isInline, Map<String, String> playerHeaders,
+    private StreamingDataRequest(String videoId, Map<String, String> playerHeaders,
                                  boolean includeVideoDetails, ClientType[] clientOrder, boolean isDownload) {
         this.videoId = videoId;
-        this.isInline = isInline;
+        this.authorization = playerHeaders.get(AUTHORIZATION_HEADER);
+        this.clientOrder = clientOrder;
         this.future = Utils.submitOnBackgroundThread(
-                () -> fetch(resolveVideoIdToFetch(videoId), isInline, playerHeaders, includeVideoDetails,
+                () -> fetch(resolveVideoIdToFetch(videoId), playerHeaders, includeVideoDetails,
                         clientOrder, isDownload));
     }
 
-    public static void fetchRequest(String videoId, boolean isInline, Map<String, String> fetchHeaders) {
-        // Keep the latest player headers so downloads can resolve tracks that were never opened.
-        if (fetchHeaders != null && !fetchHeaders.isEmpty()) {
-            lastPlayerHeaders = fetchHeaders;
+    /**
+     * Keeps the headers of an InnerTube request of the app, for the fetches that are started without
+     * a request, and so downloads can resolve tracks that were never opened.
+     * Called for every InnerTube request, because a video can be loaded before any request for a video is seen.
+     */
+    public static void setAppHeaders(@Nullable Map<String, String> requestHeaders) {
+        if (requestHeaders != null && !requestHeaders.isEmpty()) {
+            lastAppHeaders = requestHeaders;
         }
-        // Always fetch, even if there is an existing request for the same video.
-        cache.put(videoId, new StreamingDataRequest(videoId, isInline, fetchHeaders, false,
-                clientOrderToUse, false));
+    }
+
+    public static void fetchRequest(String videoId, Map<String, String> fetchHeaders) {
+        ClientType[] clientOrder = clientOrderToUse;
+        synchronized (cache) {
+            // The app can ask for the same video again while the first fetch is still running.
+            // A fetch that is done is never reused, because its streams can be expired or missing.
+            StreamingDataRequest existing = cache.get(videoId);
+            if (existing != null && existing.isFetchInProgress(fetchHeaders, clientOrder)) {
+                Logger.printDebug(() -> "Using the fetch in progress for: " + videoId);
+                return;
+            }
+            cache.put(videoId, new StreamingDataRequest(videoId, fetchHeaders, false, clientOrder, false));
+        }
+    }
+
+    private boolean isFetchInProgress(Map<String, String> playerHeaders, ClientType[] clientOrder) {
+        return !future.isDone()
+                && this.clientOrder == clientOrder
+                && Objects.equals(authorization, playerHeaders.get(AUTHORIZATION_HEADER));
     }
 
     /**
-     * Resolves a video that the app never opened, using the latest player headers.
+     * Starts fetching the streams of a video that the app loads with a request that is not seen,
+     * unless a fetch for the video can still be used.
+     */
+    public static void fetchRequestIfNeeded(String videoId) {
+        synchronized (cache) {
+            StreamingDataRequest existing = cache.get(videoId);
+            if (existing == null || !existing.canReuse()) {
+                fetchWithLastHeaders(videoId);
+            }
+        }
+    }
+
+    /**
+     * @return The fetch of the streams to give to the player of the video. If no fetch can be used,
+     *         a fetch is started now.
+     */
+    public static StreamingDataRequest getOrFetchRequest(String videoId) {
+        synchronized (cache) {
+            StreamingDataRequest existing = cache.get(videoId);
+            if (existing != null && existing.canReuse()) {
+                return existing;
+            }
+            return fetchWithLastHeaders(videoId);
+        }
+    }
+
+    private static StreamingDataRequest fetchWithLastHeaders(String videoId) {
+        Logger.printDebug(() -> "Fetching streams without a player request for: " + videoId);
+        StreamingDataRequest request = new StreamingDataRequest(videoId, lastAppHeaders, false,
+                clientOrderToUse, false);
+        cache.put(videoId, request);
+        return request;
+    }
+
+    /**
+     * Called when a media response asks the player to load the player response of its video again.
+     * The fetches started before are not reused, since they can hold the streams the player is asked to replace.
+     * This does not know the video, but a reload is rare.
+     */
+    public static void onPlayerResponseReloadRequested() {
+        playerResponseReloadCount.incrementAndGet();
+    }
+
+    /**
+     * @return If the streams of this fetch can be given to a player that is set up with the headers
+     *         of the latest request that loads a video.
+     */
+    private boolean canReuse() {
+        // The account can be changed since this fetch.
+        if (!Objects.equals(authorization, lastAppHeaders.get(AUTHORIZATION_HEADER))) {
+            return false;
+        }
+        if (playerResponseReloadCountAtFetch != playerResponseReloadCount.get()) {
+            return false;
+        }
+        if (!future.isDone()) {
+            return true;
+        }
+        final long age = System.currentTimeMillis() - fetchStartTime;
+        return age < MAX_MILLISECONDS_TO_REUSE_FAILED_FETCH
+                || (age < MAX_MILLISECONDS_TO_REUSE_STREAMS && getStream() != null);
+    }
+
+    /**
+     * Uses headers captured during playback so a song can be downloaded without first playing it.
      * Deliberately not cached, so downloads cannot evict the streams of videos being watched.
      * <p>
      * The clients are given by the caller instead of taken from the playback order, which stays at
      * the enum default while spoofing is off and then begins with a SABR client that has no urls.
+     *
+     * @param preferredClient Tried first, unless it is a SABR client.
      */
     public static StreamingDataRequest fetchRequestForDownload(String videoId,
                                                                List<ClientType> downloadClients,
                                                                ClientType preferredClient) {
-        ClientType[] clientOrder = buildClientOrder(downloadClients, preferredClient)
-                .toArray(new ClientType[0]);
+        List<ClientType> clients = buildClientOrder(downloadClients, preferredClient);
+        // SABR clients answer without the format urls a download needs,
+        // so the next client would never be tried.
+        clients.removeIf(client -> client.requireSABR);
+        ClientType[] clientOrder = clients.toArray(new ClientType[0]);
         // The video details name the saved file, so the download asks for them as well.
-        return new StreamingDataRequest(videoId, false, lastPlayerHeaders, true, clientOrder, true);
+        // The auth hook keeps the headers even if spoofing is off, but it is not used by all apps.
+        Map<String, String> headers = AuthUtils.getAuthorization().isEmpty()
+                ? lastAppHeaders
+                : AuthUtils.getRequestHeader();
+        return new StreamingDataRequest(videoId, headers, true, clientOrder, true);
     }
 
     @Nullable
@@ -327,9 +495,17 @@ public class StreamingDataRequest {
                             + responseCode + " response: " + connection.getResponseMessage(),
                     null, showErrorToasts);
         } catch (SocketTimeoutException ex) {
-            handleConnectionError("Connection timeout", ex, showErrorToasts);
+            if (Utils.isNetworkConnected()) {
+                handleConnectionError("Connection timeout", ex, showErrorToasts);
+            } else {
+                Logger.printInfo(() -> "Connection timeout while network disconnected", ex);
+            }
         } catch (IOException ex) {
-            handleConnectionError("Network error", ex, showErrorToasts);
+            if (Utils.isNetworkConnected()) {
+                handleConnectionError("Network error", ex, showErrorToasts);
+            } else {
+                Logger.printInfo(() -> "Network error while network disconnected", ex);
+            }
         } catch (Exception ex) {
             Logger.printException(() -> "send failed", ex);
         } finally {
@@ -343,8 +519,7 @@ public class StreamingDataRequest {
     @Nullable
     private static StreamData buildPlayerResponseBuffer(ClientType clientType,
                                                         HttpURLConnection connection,
-                                                        String videoId,
-                                                        boolean isInline) {
+                                                        String videoId) {
         if (connection == null) {
             return null;
         }
@@ -404,7 +579,7 @@ public class StreamingDataRequest {
             if ((clientType == ClientType.TV_SABR || clientType == ClientType.TV_SABR_WII_U)
                     && Utils.containsAny(streamingData.getServerAbrStreamingUrl(), "yt_live_broadcast", "yt_premiere_broadcast")) {
                 Logger.printDebug(() -> "Live stream detected, fallback to TV dash");
-                fallbackWithTVDash = true;
+                fallbackWithTVDashOnThread.set(true);
                 return null;
             }
 
@@ -420,33 +595,6 @@ public class StreamingDataRequest {
                     return null;
                 }
                 responseBuilder.setStreamingData(deobfuscatedStreamingDataBuilder);
-            }
-
-            // 'Force AVC' only keeps the player from using VP9, its formats are still in the stream.
-            // A default quality that only VP9 formats reach then has no format the player can use,
-            // and with SABR the video restarts at 0:01 without end, each time with a new playback nonce.
-            // HDR formats are a different codec string ('vp09.02...') and are kept, as HDR videos
-            // do not use AVC. Without any AVC format nothing is removed, so the video still plays.
-            if (SpoofVideoStreamsPatch.getForceAVC()) {
-                List<Format> adaptiveFormats = responseBuilder.getStreamingData().getAdaptiveFormatsList();
-                List<Format> withoutVP9 = new ArrayList<>(adaptiveFormats.size());
-                boolean hasAVC = false;
-                for (Format format : adaptiveFormats) {
-                    String mimeType = format.getMimeType();
-                    if (mimeType.contains("codecs=\"vp9\"")) continue;
-
-                    if (mimeType.startsWith("video") && mimeType.contains("avc")) {
-                        hasAVC = true;
-                    }
-                    withoutVP9.add(format);
-                }
-
-                if (hasAVC && withoutVP9.size() < adaptiveFormats.size()) {
-                    Logger.printDebug(() -> "Removing VP9 formats, videoId: " + videoId);
-                    responseBuilder.setStreamingData(responseBuilder.getStreamingData().toBuilder()
-                            .clearAdaptiveFormats()
-                            .addAllAdaptiveFormats(withoutVP9));
-                }
             }
 
             byte[] streamingDataBuffer = responseBuilder.build().toByteArray();
@@ -467,28 +615,48 @@ public class StreamingDataRequest {
                     playerGestureConfigBuilder.setDownAndOutPortraitAllowed(true);
                     playerGestureConfigBuilder.setDownAndOutLandscapeAllowed(true);
                     playerConfigBuilder.setPlayerGestureConfig(playerGestureConfigBuilder);
-
-                    // In autoplay in feed, 'inline' query parameters and unique player parameters are used when sending requests.
-                    // To minimize code modifications, simply add 'inlinePlaybackConfig' using proto builder.
-                    if (isInline) {
-                        AudioConfig.Builder audioConfigBuilder = playerConfigBuilder.getAudioConfig().toBuilder();
-                        audioConfigBuilder.setMuteOnStart(true);
-                        playerConfigBuilder.setAudioConfig(audioConfigBuilder);
-
-                        InlinePlaybackConfig.Builder inlinePlaybackConfigBuilder = playerConfigBuilder.getInlinePlaybackConfig().toBuilder();
-                        inlinePlaybackConfigBuilder.setShowAudioControls(true);
-                        inlinePlaybackConfigBuilder.setShowScrubbingControls(true);
-                        playerConfigBuilder.setInlinePlaybackConfig(inlinePlaybackConfigBuilder);
-                    }
+                    // How the video is played inline is added when the config is given to the player,
+                    // so the same fetch can be used by an inline player and by the full player.
                 }
 
                 playerConfigBuffer = playerConfigBuilder.build().toByteArray();
             }
 
-            return new StreamData(streamingDataBuffer, playerConfigBuffer, hasAndroidMedia);
+            return new StreamData(streamingDataBuffer, playerConfigBuffer, hasAndroidMedia, clientType);
         } catch (IOException ex) {
             Logger.printException(() -> "Failed to write player response for video stream", ex);
             return null;
+        }
+    }
+
+    /**
+     * The player config of the client replaces the whole player config of the app, and it does not
+     * tell how the video is played inline. The app player config does, such as for a muted preview in the feed.
+     *
+     * @return The player config with how the app player config plays the video inline.
+     */
+    public static byte[] addInlinePlayback(byte[] playerConfig, byte[] appPlayerConfig) {
+        try {
+            PlayerConfig appConfig = PlayerConfig.parseFrom(appPlayerConfig);
+            final boolean muteOnStart = appConfig.getAudioConfig().getMuteOnStart();
+            final boolean hasInlinePlaybackConfig = appConfig.hasInlinePlaybackConfig();
+            if (!muteOnStart && !hasInlinePlaybackConfig) {
+                return playerConfig;
+            }
+            Logger.printDebug(() -> "Adding inline playback of the app player config, muteOnStart: "
+                    + muteOnStart + ", inlinePlaybackConfig: " + hasInlinePlaybackConfig);
+
+            PlayerConfig.Builder builder = PlayerConfig.parseFrom(playerConfig).toBuilder();
+            if (muteOnStart) {
+                builder.setAudioConfig(builder.getAudioConfig().toBuilder().setMuteOnStart(true));
+            }
+            if (hasInlinePlaybackConfig) {
+                builder.setInlinePlaybackConfig(appConfig.getInlinePlaybackConfig());
+            }
+            return builder.build().toByteArray();
+        } catch (InvalidProtocolBufferException ex) {
+            Logger.printException(() -> "addInlinePlayback failure", ex);
+            return playerConfig;
         }
     }
 
@@ -500,8 +668,13 @@ public class StreamingDataRequest {
         return false;
     }
 
-    private static StreamData fetch(String videoId, boolean isInline, Map<String, String> playerHeaders,
+    private static StreamData fetch(String videoId, Map<String, String> playerHeaders,
                                     boolean includeVideoDetails, ClientType[] clientOrder, boolean isDownload) {
+        if (!Utils.isNetworkConnected()) {
+            Logger.printDebug(() -> "Network not connected, skipping stream fetch for: " + videoId);
+            return null;
+        }
+
         final boolean debugEnabled = BaseSettings.DEBUG.get();
         final long fetchStartTime = System.currentTimeMillis();
         String authorization = playerHeaders.get(AUTHORIZATION_HEADER);
@@ -523,20 +696,24 @@ public class StreamingDataRequest {
 
             HttpURLConnection connection =
                     send(clientType, videoId, authorization, showErrorToast, includeVideoDetails);
-            StreamData streamingData = buildPlayerResponseBuffer(clientType, connection, videoId, isInline);
+            fallbackWithTVDashOnThread.set(false);
+            StreamData streamingData = buildPlayerResponseBuffer(clientType, connection, videoId);
 
-            if ((clientType == ClientType.TV_SABR || clientType == ClientType.TV_SABR_WII_U) && fallbackWithTVDash) {
-                fallbackWithTVDash = false;
+            if ((clientType == ClientType.TV_SABR || clientType == ClientType.TV_SABR_WII_U)
+                    && fallbackWithTVDashOnThread.get()) {
+                fallbackWithTVDashOnThread.set(false);
                 clientType = ClientType.TV_DASH;
                 HttpURLConnection fallBackConnection =
                         send(clientType, videoId, authorization, showErrorToast, includeVideoDetails);
-                streamingData = buildPlayerResponseBuffer(clientType, fallBackConnection, videoId, isInline);
+                streamingData = buildPlayerResponseBuffer(clientType, fallBackConnection, videoId);
             }
 
             if (streamingData != null) {
-                // Stats for nerds describes what is playing, which a download never changes.
+                // Stats for nerds and the SABR choice describe what is playing,
+                // so the client is set when the streams are given to the player, and not here.
                 if (!isDownload) {
-                    lastSpoofedClientType = clientType;
+                    // The first attempt is with the default client.
+                    PreferredClientCheck.onStreamsFetched(videoId, i == 1, clientType);
                 }
 
                 if (clientType.requireJS) {
@@ -556,7 +733,10 @@ public class StreamingDataRequest {
             return null;
         }
 
-        lastSpoofedClientType = null;
+        if (!Utils.isNetworkConnected()) {
+            return null;
+        }
+
         handleConnectionError(str("morphe_spoof_video_streams_no_clients_toast"), null, true);
 
         ClientType preferredClient = clientOrder[0];
@@ -567,11 +747,6 @@ public class StreamingDataRequest {
         return null;
     }
 
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    public boolean fetchIsDone() {
-        return future.isDone();
-    }
-
     @Nullable
     public StreamData getStream() {
         try {
@@ -580,7 +755,7 @@ public class StreamingDataRequest {
             // This is not a concern, since the fetch will always be finished
             // and never block the main thread.
             // But if debugging, then still verify this is the situation.
-            if (BaseSettings.DEBUG.get() && !fetchIsDone() && Utils.isCurrentlyOnMainThread()) {
+            if (BaseSettings.DEBUG.get() && !future.isDone() && Utils.isCurrentlyOnMainThread()) {
                 Logger.printException(() -> "Debug: Blocking main thread");
             }
             return future.get(MAX_MILLISECONDS_TO_WAIT_FOR_FETCH, TimeUnit.MILLISECONDS);
@@ -603,6 +778,6 @@ public class StreamingDataRequest {
     @NonNull
     @Override
     public String toString() {
-        return "StreamingDataRequest{" + "videoId='" + videoId + "', isInline='" + isInline + '\'' + '}';
+        return "StreamingDataRequest{" + "videoId='" + videoId + '\'' + '}';
     }
 }

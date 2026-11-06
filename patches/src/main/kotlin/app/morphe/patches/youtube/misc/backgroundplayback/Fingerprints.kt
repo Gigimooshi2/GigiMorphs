@@ -11,10 +11,13 @@
 package app.morphe.patches.youtube.misc.backgroundplayback
 
 import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.InstructionLocation.MatchAfterWithin
 import app.morphe.patcher.OpcodesFilter
 import app.morphe.patcher.literal
+import app.morphe.patcher.methodCall
 import app.morphe.patcher.resource.ResourceType
 import app.morphe.patcher.resourceLiteral
+import app.morphe.patcher.string
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 
@@ -51,19 +54,60 @@ internal object BackgroundPlaybackManagerFingerprint : Fingerprint(
     )
 )
 
+/**
+ * 21.23+
+ */
 internal object BackgroundPlaybackSettingsFingerprint : Fingerprint(
+    returnType = "Ljava/lang/Object;",
+    parameters = listOf("Ljava/lang/Object;"),
+    filters = listOf(
+        // Background playback allowed.
+        methodCall(opcode = Opcode.INVOKE_VIRTUAL, returnType = "Z", parameters = listOf()),
+        methodCall(
+            smali = "Ljava/lang/Boolean;->booleanValue()Z",
+            location = MatchAfterWithin(2)
+        ),
+        resourceLiteral(
+            ResourceType.STRING,
+            "pref_background_and_offline_category",
+            location = MatchAfterWithin(10)
+        ),
+        resourceLiteral(ResourceType.STRING, "pref_background_category")
+    )
+)
+
+/**
+ * 21.22 and lower.
+ */
+internal object BackgroundPlaybackSettingsLegacyFingerprint : Fingerprint(
     accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
     returnType = "Ljava/lang/String;",
     parameters = listOf(),
     filters = listOf(
+        methodCall(returnType = "Z"),
+        // Background playback allowed.
+        methodCall(returnType = "Z"),
         resourceLiteral(ResourceType.STRING, "pref_background_and_offline_category"),
         resourceLiteral(ResourceType.STRING, "pref_background_category")
     )
 )
 
+internal const val AUTOMATIC_FOREGROUND_PLAYBACK_RESUME_FLAG = 45770945L
+
 internal object AutomaticForegroundPlaybackResumeFeatureFlagFingerprint : Fingerprint(
     filters = listOf(
-        literal(45770945L)
+        literal(AUTOMATIC_FOREGROUND_PLAYBACK_RESUME_FLAG)
+    )
+)
+
+/**
+ * Saves and restores if the video was playing when the app went to the background. Its class and
+ * the class of the main activity that restores it read the automatic foreground playback resume flag
+ * when the app goes to the background and returns to the foreground.
+ */
+internal object PlayingWhenBackgroundedFingerprint : Fingerprint(
+    filters = listOf(
+        string("was_playing_when_backgrounded")
     )
 )
 

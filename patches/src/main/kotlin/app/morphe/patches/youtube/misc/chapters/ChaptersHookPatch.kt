@@ -10,15 +10,13 @@ package app.morphe.patches.youtube.misc.chapters
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.patch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
 import app.morphe.patches.youtube.video.videoid.hookVideoId
 import app.morphe.patches.youtube.video.videoid.videoIdPatch
 import app.morphe.util.findFieldFromToString
-import app.morphe.util.indexOfFirstInstructionReversedOrThrow
 import com.android.tools.smali.dexlib2.AccessFlags
-import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
@@ -28,7 +26,7 @@ private const val EXTENSION_CLASS = "Lapp/morphe/extension/youtube/patches/Chapt
 private const val EXTENSION_TIMELINE_MARKER_INTERFACE =
     $$"Lapp/morphe/extension/youtube/patches/ChaptersHookPatch$TimelineMarker;"
 
-val chaptersHookPatch = bytecodePatch {
+val chaptersHookPatch = patch {
     dependsOn(sharedExtensionPatch, videoIdPatch)
 
     execute {
@@ -36,14 +34,16 @@ val chaptersHookPatch = bytecodePatch {
 
         getTimelineMarkersArrayFingerprint(
             TimelineMarkerFingerprint.classDef.type
-        ).method.apply {
-            val index = indexOfFirstInstructionReversedOrThrow(Opcode.RETURN_OBJECT)
-            val register = getInstruction<OneRegisterInstruction>(index).registerA
-            addInstruction(
-                index,
-                "invoke-static { v$register }, $EXTENSION_CLASS->" +
-                        "setTimelineMarkers([$EXTENSION_TIMELINE_MARKER_INTERFACE)V"
-            )
+        ).let {
+            it.method.apply {
+                val index = it.instructionMatches.last().index
+                val register = getInstruction<OneRegisterInstruction>(index).registerA
+                addInstruction(
+                    index,
+                    "invoke-static { v$register }, $EXTENSION_CLASS->" +
+                            "setTimelineMarkers([$EXTENSION_TIMELINE_MARKER_INTERFACE)V"
+                )
+            }
         }
 
         TimelineMarkerFingerprint.let {

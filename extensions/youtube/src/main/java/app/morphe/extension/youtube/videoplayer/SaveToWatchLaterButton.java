@@ -1,6 +1,7 @@
 /*
  * Copyright 2026 Morphe.
- * https://github.com/MorpheApp/morphe-patches
+ * https://github.com/MorpheApp/morphe-patches/pull/1274
+ * https://github.com/MorpheApp/morphe-patches/pull/4016
  *
  * See the included NOTICE file for GPLv3 Section 7 terms that apply to Morphe contributions.
  */
@@ -19,10 +20,12 @@ import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.ResourceType;
 import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.spoof.SpoofAppVersionPatch;
+import app.morphe.extension.youtube.patches.LocalQueuePatch;
 import app.morphe.extension.youtube.patches.SaveToWatchLaterPatch;
 import app.morphe.extension.youtube.patches.VersionCheckPatch;
 import app.morphe.extension.youtube.patches.VideoInformation;
 import app.morphe.extension.youtube.patches.utils.FlyoutUtils;
+import app.morphe.extension.youtube.patches.utils.LocalQueueSheet;
 import app.morphe.extension.youtube.patches.utils.PlaylistPatch;
 import app.morphe.extension.youtube.settings.Settings;
 
@@ -60,7 +63,9 @@ public class SaveToWatchLaterButton {
         try {
             // Start syncing queue playlist items in the background so that by the time
             // the user opens the queue menu, lastVideoIds is already populated.
-            PlaylistPatch.syncIfNeeded();
+            if (!LocalQueuePatch.isEnabled()) {
+                PlaylistPatch.syncIfNeeded();
+            }
 
             final boolean swapSaveAndQueue = Settings.SWAP_SAVE_AND_QUEUE_ACTIONS.get();
             //noinspection ExtractMethodRecommender
@@ -73,7 +78,11 @@ public class SaveToWatchLaterButton {
                         Logger.printException(() -> "Context is null");
                         return null;
                     }
-                    PlaylistPatch.prepareDialogBuilder(controls.getContext(), VideoInformation.getVideoId());
+                    if (LocalQueuePatch.isEnabled()) {
+                        LocalQueueSheet.show(controls.getContext());
+                    } else {
+                        PlaylistPatch.prepareDialogBuilder(controls.getContext(), VideoInformation.getVideoId());
+                    }
                 } else {
                     SaveToWatchLaterPatch.saveVideo(VideoInformation.getVideoId());
                 }
@@ -102,18 +111,14 @@ public class SaveToWatchLaterButton {
     }
 
     public static int addFlyoutButton(Object flyoutPanel, int nextButtonIndex, String flyoutVideoId,
-                                      boolean videoMarkedAsForKids, boolean isShortFlyout, boolean isTopFlyout) {
+                                      boolean isTopFlyout) {
         final String saveToWatchLaterButtonVideoId;
         if (!flyoutVideoId.isEmpty()) {
-            if (Settings.KIDS_SAVE_TO_WATCH_LATER_FLYOUT_BUTTON.get() &&
-                    videoMarkedAsForKids) {
-                saveToWatchLaterButtonVideoId = flyoutVideoId;
-            } else if (Settings.SHORTS_SAVE_TO_WATCH_LATER_FLYOUT_BUTTON.get() &&
-                    isShortFlyout) {
-                saveToWatchLaterButtonVideoId = flyoutVideoId;
-            } else {
-                saveToWatchLaterButtonVideoId = "";
-            }
+            // Only if the menu has no save item of the app, otherwise there are two items for the same action.
+            // The menus of playlists have no video to save.
+            saveToWatchLaterButtonVideoId = !FlyoutUtils.hasAppSaveButton() && FlyoutUtils.getFlyoutPlaylistId().isEmpty()
+                    ? flyoutVideoId
+                    : "";
         } else if (Settings.SAVE_TO_WATCH_LATER_FLYOUT_BUTTON.get() &&
                 isTopFlyout) {
             saveToWatchLaterButtonVideoId = VideoInformation.getVideoId();
@@ -122,7 +127,7 @@ public class SaveToWatchLaterButton {
         }
 
         if (!saveToWatchLaterButtonVideoId.isEmpty()) {
-            nextButtonIndex = FlyoutUtils.addFlyoutButton(
+            nextButtonIndex = FlyoutUtils.addFlyoutSaveButton(
                     flyoutPanel,
                     saveToWatchLaterDrawable,
                     saveToWatchLaterButtonName,

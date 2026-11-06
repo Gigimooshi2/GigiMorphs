@@ -12,7 +12,6 @@ package app.morphe.patches.music.misc.spoof
 
 import app.morphe.patches.music.misc.extension.hooks.YouTubeMusicApplicationInitFingerprint
 import app.morphe.patches.music.misc.extension.sharedExtensionPatch
-import app.morphe.patches.music.misc.playservice.is_9_20_or_greater
 import app.morphe.patches.music.misc.playservice.is_9_24_or_greater
 import app.morphe.patches.music.misc.playservice.versionCheckPatch
 import app.morphe.patches.music.misc.settings.PreferenceScreen
@@ -31,15 +30,11 @@ val spoofVideoStreamsPatch = spoofVideoStreamsPatch(
         MusicActivityOnCreateFingerprint,
         YouTubeMusicApplicationInitFingerprint
     ),
-    // Only 8.11 to 8.14 needed this, and those versions are no longer supported.
-    fixMediaFetchHotConfigAlternative = { false },
     fixParsePlaybackResponseFeatureFlag = { !is_9_24_or_greater },
     fixMediaSessionFeatureFlag = { true },
     fixReelItemWatchResponseFeatureFlag = { false },
     // Only 8.35 to 9.11 needed this, and those versions are no longer supported.
     restoreMissingCuepointMethod = { false },
-    patchProtoRequest = { true },
-    patchProtoRequestLegacy = { !is_9_20_or_greater },
 
     block = {
         dependsOn(

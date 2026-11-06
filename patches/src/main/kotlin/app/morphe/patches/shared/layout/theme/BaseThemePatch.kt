@@ -14,22 +14,20 @@ import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.methodCall
-import app.morphe.patcher.patch.BytecodePatchBuilder
-import app.morphe.patcher.patch.BytecodePatchContext
+import app.morphe.patcher.patch.classDefBy
+import app.morphe.patcher.patch.PatchDefinition
 import app.morphe.patcher.patch.PatchException
-import app.morphe.patcher.patch.ResourcePatchContext
-import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.patch
 import app.morphe.patcher.patch.colorOption
-import app.morphe.patcher.patch.resourcePatch
+import app.morphe.patcher.patch.listDecodableFiles
+import app.morphe.patcher.patch.readXml
+import app.morphe.patcher.patch.resourceXml
+import app.morphe.patcher.xml.ResourceXml
+import app.morphe.patcher.util.matchAllMethodIndicesForEach
+import app.morphe.patcher.util.returnEarly
 import app.morphe.patches.shared.misc.settings.overrideThemeColors
-import app.morphe.util.childElementsSequence
-import app.morphe.util.forEachChildElement
-import app.morphe.util.getNode
 import app.morphe.util.inputStreamFromBundledResource
-import app.morphe.util.matchAllMethodIndicesForEach
-import app.morphe.util.returnEarly
 import app.morphe.util.setExtensionIsPatchIncluded
-import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import java.util.Locale
 import kotlin.math.PI
@@ -338,14 +336,12 @@ internal val STYLE_DEFAULT_COLOR_NAMES_LIGHT = emptyMap<String, Set<String>>()
  * Hooks every context of the app so the app resources resolve
  * with the theme colors selected in the app settings.
  */
-private val themeColorContextHookPatch = bytecodePatch {
+private val themeColorContextHookPatch = patch {
     execute {
         Fingerprint(
             name = "attachBaseContext",
-            parameters = listOf("Landroid/content/Context;"),
-            custom = { method, _ ->
-                !AccessFlags.STATIC.isSet(method.accessFlags)
-            }
+            isStatic = false,
+            parameters = listOf("Landroid/content/Context;")
         ).matchAll().forEach {
             it.method.addInstructions(
                 0,
@@ -380,10 +376,10 @@ private val themeColorContextHookPatch = bytecodePatch {
 internal fun baseThemePatch(
     extensionClassDescriptor: String,
     includeLightColor: Boolean = false,
-    useModernLithoColorHook: BytecodePatchBuilder.() -> Boolean,
-    block: BytecodePatchBuilder.() -> Unit,
-    executeBlock: BytecodePatchContext.() -> Unit = {}
-) = bytecodePatch(
+    useModernLithoColorHook: PatchDefinition.() -> Boolean,
+    block: PatchDefinition.() -> Unit,
+    executeBlock: () -> Unit = {}
+) = patch(
     name = "Theme",
     description = "Adds options for theming, and settings to change the app foreground and background colors.",
 ) {
@@ -451,7 +447,7 @@ internal fun baseThemePatch(
  * or the other way around. A color is selected by its position in both, so one that is added
  * to only one of them silently shifts every color that follows it.
  */
-private fun BytecodePatchContext.verifyColors(
+private fun verifyColors(
     enumName: String,
     colors: List<ThemeColor>
 ) {
@@ -497,13 +493,13 @@ private fun themeColorNames(
 /**
  * The names and values of every color the app declares.
  */
-private fun ResourcePatchContext.declaredColors(colorFiles: List<String>): Map<String, String> {
+private fun declaredColors(colorFiles: List<String>): Map<String, String> {
     val declaredColors = LinkedHashMap<String, String>()
 
     colorFiles.forEach { path ->
-        document(path).use { document ->
-            document.getNode("resources").forEachChildElement {
-                declaredColors[it.getAttribute("name")] = it.textContent
+        resourceXml(path).use { colors ->
+            colors.root.children.forEach { color ->
+                color.attribute("name")?.let { declaredColors[it] = color.text }
             }
         }
     }
@@ -515,14 +511,14 @@ private fun ResourcePatchContext.declaredColors(colorFiles: List<String>): Map<S
  * The values the app declares for its theme colors, which the app default variant restores.
  * Only valid until the aliases replace them.
  */
-private fun ResourcePatchContext.originalColors(colorNames: List<String>): Map<String, String> {
+private fun originalColors(colorNames: List<String>): Map<String, String> {
     val originalColors = LinkedHashMap<String, String>()
 
-    document("res/values/colors.xml").use { document ->
-        document.getNode("resources").forEachChildElement { color ->
-            val name = color.getAttribute("name")
+    resourceXml("res/values/colors.xml").use { colors ->
+        colors.root.children.forEach { color ->
+            val name = color.attribute("name")
             if (name in colorNames) {
-                originalColors[name] = color.textContent
+                originalColors[name!!] = color.text
             }
         }
     }
@@ -530,37 +526,11 @@ private fun ResourcePatchContext.originalColors(colorNames: List<String>): Map<S
     return originalColors
 }
 
-private fun ResourcePatchContext.colorFiles(): List<String> {
-    val colorFiles = mutableListOf<String>()
-    val resDir = get("res")
-    if (!resDir.exists()) return colorFiles
+private fun colorFiles(): List<String> =
+    listDecodableFiles("res/values*/colors.xml")
 
-    resDir.listFiles()?.forEach { dir ->
-        if (dir.isDirectory && dir.name.startsWith("values")) {
-            val colorsFile = dir.resolve("colors.xml")
-            if (colorsFile.exists()) {
-                colorFiles.add("res/${dir.name}/colors.xml")
-            }
-        }
-    }
-    return colorFiles
-}
-
-private fun ResourcePatchContext.styleFiles(): List<String> {
-    val styleFiles = mutableListOf<String>()
-    val resDir = get("res")
-    if (!resDir.exists()) return styleFiles
-
-    resDir.listFiles()?.forEach { dir ->
-        if (dir.isDirectory && dir.name.startsWith("values")) {
-            val stylesFile = dir.resolve("styles.xml")
-            if (stylesFile.exists()) {
-                styleFiles.add("res/${dir.name}/styles.xml")
-            }
-        }
-    }
-    return styleFiles
-}
+private fun styleFiles(): List<String> =
+    listDecodableFiles("res/values*/styles.xml")
 
 /**
  * @param colorValues All colors the app declares.
@@ -586,7 +556,7 @@ internal fun baseThemeResourcePatch(
     styleColorNamesLight: (() -> Map<String, Set<String>>) = { STYLE_DEFAULT_COLOR_NAMES_LIGHT },
     includeLightColor: Boolean = false,
     splashScreenThemeParent: String? = null
-) = resourcePatch {
+) = patch {
     execute {
         val colorFiles = colorFiles()
         val declaredColors = declaredColors(colorFiles)
@@ -674,7 +644,7 @@ internal fun baseThemeResourcePatch(
  * Fails the patch if the setting entries of a color do not match the colors of the
  * patch. The app settings show the color of a color by its position in both lists.
  */
-private fun ResourcePatchContext.verifySettingEntries(
+private fun verifySettingEntries(
     key: String,
     resourcePath: String,
     colors: List<ThemeColor>
@@ -682,13 +652,9 @@ private fun ResourcePatchContext.verifySettingEntries(
     val stream = inputStreamFromBundledResource("addresources", resourcePath)
         ?: throw PatchException("Could not find the setting entries: $resourcePath")
 
-    val arrays = mutableMapOf<String, List<String>>()
-    stream.use {
-        document(it).use { document ->
-            document.getNode("resources").forEachChildElement { array ->
-                arrays[array.getAttribute("name")] =
-                    array.childElementsSequence().map { item -> item.textContent }.toList()
-            }
+    val arrays = stream.use { input ->
+        readXml(input).use { xml ->
+            xml.root.children.associate { array -> array.attribute("name").orEmpty() to array.children("item").map { it.text } }
         }
     }
 
@@ -707,7 +673,7 @@ private fun ResourcePatchContext.verifySettingEntries(
  * Gives the theme colors of the app the color that is set as a patch option, which is what
  * the Theme patch did before the color could be changed in the app settings.
  */
-private fun ResourcePatchContext.replaceColors(
+private fun replaceColors(
     colorFiles: List<String>,
     styleFiles: List<String>,
     declaredColors: Map<String, String>,
@@ -726,40 +692,31 @@ private fun ResourcePatchContext.replaceColors(
     }
 
     colorFiles.forEach { path ->
-        document(path).use { document ->
-            document.getNode("resources").forEachChildElement { node ->
-                val name = node.getAttribute("name")
+        resourceXml(path).use { colors ->
+            colors.transformColors { name, value ->
                 val color = when (name) {
                     in darkColorNames -> darkColor
                     in lightColorNames -> lightColor
-                    else -> return@forEachChildElement
+                    else -> return@transformColors null
                 }
 
-                val alpha = parseAlpha(resolveColorValue(node.textContent, declaredColors))
-                node.textContent = applyAlpha(color, alpha)
+                val alpha = parseAlpha(resolveColorValue(value, declaredColors))
+                applyAlpha(color, alpha)
             }
         }
     }
 
     styleFiles.forEach { path ->
-        document(path).use { document ->
-            document.getNode("resources").forEachChildElement { style ->
-                if (style.tagName != "style") return@forEachChildElement
-                val styleName = style.getAttribute("name")
-
-                style.forEachChildElement { item ->
-                    if (item.tagName != "item") return@forEachChildElement
-                    val itemName = item.getAttribute("name")
-
-                    val color = when {
-                        itemName in styleColorNamesDark[styleName].orEmpty() -> darkColor
-                        includeLightColor && itemName in styleColorNamesLight[styleName].orEmpty() -> lightColor
-                        else -> return@forEachChildElement
-                    }
-
-                    val alpha = parseAlpha(resolveColorValue(item.textContent, declaredColors))
-                    item.textContent = applyAlpha(color, alpha)
+        resourceXml(path).use { styles ->
+            styles.transformStyleItems { styleName, itemName, value ->
+                val color = when {
+                    itemName in styleColorNamesDark[styleName].orEmpty() -> darkColor
+                    includeLightColor && itemName in styleColorNamesLight[styleName].orEmpty() -> lightColor
+                    else -> return@transformStyleItems null
                 }
+
+                val alpha = parseAlpha(resolveColorValue(value, declaredColors))
+                applyAlpha(color, alpha)
             }
         }
     }
@@ -774,33 +731,28 @@ private fun ResourcePatchContext.replaceColors(
  *
  * @param parentStyle The theme of the launcher activity, so that only the color of it differs.
  */
-private fun ResourcePatchContext.addSplashScreenThemes(
+private fun addSplashScreenThemes(
     parentStyle: String,
     includeLightColor: Boolean
 ) {
-    document("res/values/styles.xml").use { document ->
-        val resources = document.getNode("resources")
-
+    resourceXml("res/values/styles.xml", copy = false).use { styles ->
         fun addTheme(index: Int, color: String) {
-            val style = document.createElement("style")
-            style.setAttribute("name", SPLASH_THEME_NAME + index)
-            style.setAttribute("parent", parentStyle)
+            styles.root.appendChild("style") {
+                setAttribute("name", "$SPLASH_THEME_NAME$index")
+                setAttribute("parent", parentStyle)
 
-            // The first is used since Android 12, and the second by everything the app draws
-            // until the splash screen is gone.
-            arrayOf(
-                "android:windowSplashScreenBackground",
-                "android:windowBackground"
-            ).forEach { name ->
-                style.appendChild(
-                    document.createElement("item").apply {
+                // The first is used since Android 12, and the second by everything the app draws
+                // until the splash screen is gone.
+                arrayOf(
+                    "android:windowSplashScreenBackground",
+                    "android:windowBackground"
+                ).forEach { name ->
+                    appendChild("item") {
                         setAttribute("name", name)
-                        textContent = color
+                        text = color
                     }
-                )
+                }
             }
-
-            resources.appendChild(style)
         }
 
         fun addThemes(
@@ -832,37 +784,26 @@ private fun ResourcePatchContext.addSplashScreenThemes(
  * Declares the theme colors as overlayable, which an overlay the app registers for itself
  * requires. Without this the system rejects the overlay of a custom theme color.
  */
-private fun ResourcePatchContext.declareOverlayableColors(colorNames: List<String>) {
+private fun declareOverlayableColors(colorNames: List<String>) {
     // A policy item is resolved while encoding, and every name is one of the app declares.
     if (colorNames.isEmpty()) {
         throw PatchException("Could not find any theme color to declare as overlayable")
     }
 
-    val overlayable = buildString {
-        appendLine("    <overlayable name=\"$THEME_COLOR_OVERLAYABLE_NAME\">")
-        appendLine("        <policy type=\"public\">")
-        colorNames.forEach { name ->
-            appendLine("            <item type=\"color\" name=\"$name\" />")
-        }
-        appendLine("        </policy>")
-        appendLine("    </overlayable>")
-    }
-
-    // The app can declare overlayables of its own, and those must be kept.
-    val overlayableFile = get("res").resolve("values/overlayable.xml")
-    if (overlayableFile.exists()) {
-        overlayableFile.writeText(
-            overlayableFile.readText().replaceFirst("</resources>", "$overlayable</resources>")
-        )
-    } else {
-        overlayableFile.writeText(
-            buildString {
-                appendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>")
-                appendLine("<resources>")
-                append(overlayable)
-                appendLine("</resources>")
+    // The app can declare overlayables of its own, which are kept, as this only adds one.
+    resourceXml("res/values/overlayable.xml", copy = false).use { overlayables ->
+        overlayables.root.appendChild("overlayable") {
+            setAttribute("name", THEME_COLOR_OVERLAYABLE_NAME)
+            appendChild("policy") {
+                setAttribute("type", "public")
+                colorNames.forEach { name ->
+                    appendChild("item") {
+                        setAttribute("type", "color")
+                        setAttribute("name", name)
+                    }
+                }
             }
-        )
+        }
     }
 }
 
@@ -899,7 +840,7 @@ private fun themeColors(
 /**
  * @param aliasAlphas The alpha channel of each alias color.
  */
-private fun ResourcePatchContext.addColorVariants(
+private fun addColorVariants(
     indexOffset: Int,
     colors: List<ThemeColor>,
     lLevels: FloatArray,
@@ -940,7 +881,7 @@ private fun ResourcePatchContext.addColorVariants(
  * @param includeLightColor      If the light theme has its own theme color.
  * @return The alpha channel of each alias color.
  */
-private fun ResourcePatchContext.addColorAliases(
+private fun addColorAliases(
     colorFiles: List<String>,
     styleFiles: List<String>,
     declaredColors: Map<String, String>,
@@ -950,84 +891,95 @@ private fun ResourcePatchContext.addColorAliases(
 ): Map<String, Int> {
     val aliasAlphas = LinkedHashMap<String, Int>()
 
-    colorFiles.forEach { path ->
-        document(path).use { document ->
-            val resources = document.getNode("resources")
+    fun colorAlias(aliasBaseName: String, value: String): String {
+        val alpha = parseAlpha(resolveColorValue(value, declaredColors))
+        val colorAlias = if (alpha == 0xFF) {
+            aliasBaseName
+        } else {
+            "${aliasBaseName}_opacity_${"%02X".format(alpha)}"
+        }
 
-            resources.forEachChildElement { color ->
-                val name = color.getAttribute("name")
+        aliasAlphas[colorAlias] = alpha
+        return "@color/$colorAlias"
+    }
+
+    colorFiles.forEach { path ->
+        resourceXml(path).use { colors ->
+            colors.transformColors { name, value ->
                 val aliasBaseName = when (name) {
                     in darkColorNames -> THEME_COLOR_DARK
                     in lightColorNames -> if (includeLightColor) THEME_COLOR_LIGHT else null
                     else -> null
-                } ?: return@forEachChildElement
+                } ?: return@transformColors null
 
-                val alpha = parseAlpha(resolveColorValue(color.textContent, declaredColors))
-                val colorAlias = if (alpha == 0xFF) {
-                    aliasBaseName
-                } else {
-                    "${aliasBaseName}_opacity_${"%02X".format(alpha)}"
-                }
-
-                aliasAlphas[colorAlias] = alpha
-                color.textContent = "@color/$colorAlias"
+                colorAlias(aliasBaseName, value)
             }
         }
     }
 
     styleFiles.forEach { path ->
-        document(path).use { document ->
-            document.getNode("resources").forEachChildElement { style ->
-                if (style.tagName != "style") return@forEachChildElement
-                val styleName = style.getAttribute("name")
-
-                style.forEachChildElement { item ->
-                    if (item.tagName != "item") return@forEachChildElement
-                    val itemName = item.getAttribute("name")
-
-                    val aliasBaseName = when {
-                        itemName in styleColorNamesDark[styleName].orEmpty() -> THEME_COLOR_DARK
-                        includeLightColor && itemName in styleColorNamesLight[styleName].orEmpty() -> THEME_COLOR_LIGHT
-                        else -> return@forEachChildElement
-                    }
-
-                    val alpha = parseAlpha(resolveColorValue(item.textContent, declaredColors))
-                    val colorAlias = if (alpha == 0xFF) {
-                        aliasBaseName
-                    } else {
-                        "${aliasBaseName}_opacity_${"%02X".format(alpha)}"
-                    }
-
-                    aliasAlphas[colorAlias] = alpha
-                    item.textContent = "@color/$colorAlias"
+        resourceXml(path).use { styles ->
+            styles.transformStyleItems { styleName, itemName, value ->
+                val aliasBaseName = when {
+                    itemName in styleColorNamesDark[styleName].orEmpty() -> THEME_COLOR_DARK
+                    includeLightColor && itemName in styleColorNamesLight[styleName].orEmpty() -> THEME_COLOR_LIGHT
+                    else -> return@transformStyleItems null
                 }
+
+                colorAlias(aliasBaseName, value)
             }
         }
     }
 
     // Without a variant the alias resolves to the color of the unpatched app, which is
     // what the system draws the splash screen of the app default with.
-    document("res/values/colors.xml").use { document ->
-        val resources = document.getNode("resources")
-
+    resourceXml("res/values/colors.xml", copy = false).use { colors ->
         aliasAlphas.forEach { (name, alpha) ->
-            resources.appendChild(
-                document.createElement("color").apply {
-                    setAttribute("name", name)
-
-                    // The color is the unpatched color of the app.
-                    val originalColor = if (isDarkThemeColorAlias(name)) {
-                        DEFAULT_THEME_COLOR_DARK
-                    } else {
-                        DEFAULT_THEME_COLOR_LIGHT
-                    }
-                    textContent = applyAlpha(originalColor, alpha)
-                }
-            )
+            // The color is the unpatched color of the app.
+            val originalColor = if (isDarkThemeColorAlias(name)) {
+                DEFAULT_THEME_COLOR_DARK
+            } else {
+                DEFAULT_THEME_COLOR_LIGHT
+            }
+            colors.root.appendChild("color") {
+                setAttribute("name", name)
+                text = applyAlpha(originalColor, alpha)
+            }
         }
     }
 
     return aliasAlphas
+}
+
+/**
+ * Transforms the value of the colors of a colors file.
+ *
+ * @param transform Returns the new value of a color, or null to keep it.
+ */
+private fun ResourceXml.transformColors(transform: (name: String, value: String) -> String?) {
+    root.children.forEach { color ->
+        val name = color.attribute("name") ?: return@forEach
+        val value = transform(name, color.text) ?: return@forEach
+        if (value != color.text) color.text = value
+    }
+}
+
+/**
+ * Transforms the value of the items of the styles.
+ *
+ * @param transform Returns the new value of an item, or null to keep it.
+ */
+private fun ResourceXml.transformStyleItems(
+    transform: (styleName: String, itemName: String, value: String) -> String?
+) {
+    root.children("style").forEach { style ->
+        val styleName = style.attribute("name") ?: return@forEach
+        style.children("item").forEach { item ->
+            val itemName = item.attribute("name") ?: return@forEach
+            val value = transform(styleName, itemName, item.text) ?: return@forEach
+            if (value != item.text) item.text = value
+        }
+    }
 }
 
 private fun isDarkThemeColorAlias(aliasName: String) =
@@ -1105,7 +1057,7 @@ private fun paletteColor(lLevels: FloatArray, index: Int): String {
     return "#%02X%02X%02X".format(ri, gi, bi)
 }
 
-private fun ResourcePatchContext.writeColorVariant(
+private fun writeColorVariant(
     index: Int,
     colors: Map<String, String>,
     isDark: Boolean
@@ -1116,17 +1068,13 @@ private fun ResourcePatchContext.writeColorVariant(
             (index - if (isDark) THEME_INDEX_OFFSET_DARK else THEME_INDEX_OFFSET_LIGHT)
     val qualifier = if (isDark) "mcc$code" else "mnc$code"
 
-    val variantDirectory = get("res").resolve("values-$qualifier")
-    variantDirectory.mkdirs()
-
-    variantDirectory.resolve("colors.xml").writeText(
-        buildString {
-            appendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>")
-            appendLine("<resources>")
-            colors.forEach { (name, color) ->
-                appendLine("    <color name=\"$name\">$color</color>")
+    // A configuration of its own, which the app does not have.
+    resourceXml("res/values-$qualifier/colors.xml", copy = false).use { variant ->
+        colors.forEach { (name, color) ->
+            variant.root.appendChild("color") {
+                setAttribute("name", name)
+                text = color
             }
-            appendLine("</resources>")
         }
-    )
+    }
 }

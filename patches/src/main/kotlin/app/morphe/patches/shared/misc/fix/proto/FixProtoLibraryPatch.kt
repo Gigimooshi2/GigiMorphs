@@ -1,6 +1,6 @@
 /*
  * Copyright 2026 Morphe.
- * https://github.com/MorpheApp/morphe-patches
+ * https://github.com/MorpheApp/morphe-patches/pull/285
  *
  * See the included NOTICE file for GPLv3 Section 7 terms that apply to this code.
  */
@@ -9,7 +9,7 @@ package app.morphe.patches.shared.misc.fix.proto
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.patch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.morphe.util.cloneMutable
@@ -31,7 +31,7 @@ internal lateinit var mutableCopyMethodRef : WeakReference<MethodReference>
  * Instead of relocating all classes in the extension,
  * Only the methods necessary for the patch to function are added.
  */
-internal val fixProtoLibraryPatch = bytecodePatch(
+internal val fixProtoLibraryPatch = patch(
     description = "Fix method not found exception that can occur when proto libraries used in extensions are merged."
 ) {
     execute {
@@ -61,34 +61,34 @@ internal val fixProtoLibraryPatch = bytecodePatch(
             }
         }
 
-        MessageLiteWriteToFingerprint.let {
-            it.method.apply {
-                it.classDef.methods.add(
-                    cloneMutable(
-                        parameters = listOf(
-                            ImmutableMethodParameter(
-                                "Lcom/google/protobuf/CodedOutputStream;",
-                                null,
-                                null
-                            )
+        // Use matchAll to pass --validation because both matches are for same class which is ok.
+        MessageLiteWriteToFingerprint.matchAll(2.. 2).first().let {
+            it.classDef.methods.add(
+                it.method.cloneMutable(
+                    parameters = listOf(
+                        ImmutableMethodParameter(
+                            "Lcom/google/protobuf/CodedOutputStream;",
+                            null,
+                            null
                         )
                     )
                 )
-            }
+            )
         }
 
         parseByteArrayMethodRef = WeakReference(ProtobufClassParseByteArrayFingerprint.method)
         parseByteArrayWithRegistryMethodRef = WeakReference(ProtobufClassParseByteArrayWithRegistryFingerprint.method)
 
-        StreamingDataOuterClassFingerprint.let {
+        // Matches two methods in same class, but both are identical.
+        StreamingDataOuterClassFingerprint.matchAll(2..2).first().let {
             it.method.apply {
                 val immutableMethodIndex = it.instructionMatches.first().index
                 val mutableCopyMethodIndex = it.instructionMatches.last().index
 
-                val immutableMethodReference =
-                    getInstruction<ReferenceInstruction>(immutableMethodIndex).reference as MethodReference
-                val mutableCopyMethodReference =
-                    getInstruction<ReferenceInstruction>(mutableCopyMethodIndex).reference as MethodReference
+                val immutableMethodReference = getInstruction<ReferenceInstruction>(
+                    immutableMethodIndex).reference as MethodReference
+                val mutableCopyMethodReference = getInstruction<ReferenceInstruction>(
+                    mutableCopyMethodIndex).reference as MethodReference
 
                 immutableMethodRef = WeakReference(immutableMethodReference)
                 mutableCopyMethodRef = WeakReference(mutableCopyMethodReference)

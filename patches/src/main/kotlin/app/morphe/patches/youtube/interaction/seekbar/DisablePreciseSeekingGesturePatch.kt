@@ -1,9 +1,7 @@
 package app.morphe.patches.youtube.interaction.seekbar
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
-import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.patch.bytecodePatch
-import app.morphe.patcher.util.smali.ExternalLabel
+import app.morphe.patcher.patch.patch
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
 import app.morphe.patches.youtube.misc.settings.PreferenceScreen
@@ -12,7 +10,7 @@ import app.morphe.patches.youtube.misc.settings.settingsPatch
 private const val EXTENSION_CLASS =
     "Lapp/morphe/extension/youtube/patches/DisablePreciseSeekingGesturePatch;"
 
-val disablePreciseSeekingGesturePatch = bytecodePatch(
+val disablePreciseSeekingGesturePatch = patch(
     description = "Adds an option to disable precise seeking when swiping up on the seekbar.",
 ) {
     dependsOn(
@@ -33,8 +31,9 @@ val disablePreciseSeekingGesturePatch = bytecodePatch(
                     move-result v0
                     if-eqz v0, :disabled
                     return-void
-                """,
-                ExternalLabel("disabled", getInstruction(0)),
+                    :disabled
+                    nop
+                """
             )
         }
 
@@ -47,8 +46,9 @@ val disablePreciseSeekingGesturePatch = bytecodePatch(
                     if-eqz v0, :disabled
                     const/4 v0, 0x0
                     return v0
-                """,
-                ExternalLabel("disabled", getInstruction(0)),
+                    :disabled
+                    nop
+                """
             )
         }
     }

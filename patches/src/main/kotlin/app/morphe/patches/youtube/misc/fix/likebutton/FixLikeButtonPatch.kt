@@ -13,7 +13,7 @@ package app.morphe.patches.youtube.misc.fix.likebutton
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.patch
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
 import app.morphe.patches.youtube.misc.playertype.playerTypeHookPatch
 import com.android.tools.smali.dexlib2.AccessFlags
@@ -27,7 +27,7 @@ private const val EXTENSION_CLASS =
 /**
  * Fixes https://github.com/MorpheApp/morphe-patches/issues/113.
  */
-internal val fixLikeButtonPatch = bytecodePatch{
+internal val fixLikeButtonPatch = patch{
     dependsOn(
         sharedExtensionPatch,
         playerTypeHookPatch,
@@ -45,23 +45,23 @@ internal val fixLikeButtonPatch = bytecodePatch{
 
                 Pair(
                     Fingerprint(
+                        interfaces = listOf(abstractClass),
                         name = lottieAnimationUrlMethodName,
                         accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
                         returnType = "Ljava/lang/String;",
                         parameters = listOf(),
-                        custom = { method, classDef ->
-                            method.implementation!!.instructions.count() > 7 &&
-                                classDef.interfaces.contains(abstractClass)
+                        custom = { method, _ ->
+                            method.implementation!!.instructions.count() > 7
                         }
                     ),
                     Fingerprint(
+                        interfaces = listOf(abstractClass),
                         name = lottieAnimationUrlMethodName,
                         accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
                         returnType = "Ljava/lang/String;",
                         parameters = listOf(),
-                        custom = { method, classDef ->
-                            method.implementation!!.instructions.count() < 7 &&
-                                    classDef.interfaces.contains(abstractClass)
+                        custom = { method, _ ->
+                            method.implementation!!.instructions.count() < 7
                         }
                     )
                 )

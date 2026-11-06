@@ -3,7 +3,7 @@ package app.morphe.patches.youtube.layout.captions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.patch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.morphe.patches.shared.misc.settings.preference.InputType
 import app.morphe.patches.shared.misc.settings.preference.NonInteractivePreference
@@ -21,7 +21,7 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 private const val EXTENSION_CLASS =
     "Lapp/morphe/extension/youtube/patches/CaptionCookiesPatch;"
 
-internal val captionCookiesPatch = bytecodePatch(
+internal val captionCookiesPatch = patch(
     description = "Adds an option to set cookies in Timed Text API (Caption Data API) requests.",
 ) {
     dependsOn(
@@ -43,6 +43,7 @@ internal val captionCookiesPatch = bytecodePatch(
         ))
 
         TimedTextUrlFingerprint.let {
+            it.clearMatch() // Fingerprint is shared and indexes may no longer be correct.
             it.method.apply {
                 val helperMethod = ImmutableMethod(
                     definingClass,
@@ -56,7 +57,7 @@ internal val captionCookiesPatch = bytecodePatch(
                     ),
                     "V",
                     AccessFlags.PRIVATE.value or AccessFlags.FINAL.value,
-                    annotations,
+                    null,
                     null,
                     MutableMethodImplementation(4),
                 ).toMutable().apply {
@@ -89,10 +90,10 @@ internal val captionCookiesPatch = bytecodePatch(
 
                 it.classDef.methods.add(helperMethod)
 
-                val urlIndex = it.instructionMatches.first().index
+                val urlIndex = it.instructionMatches[0].index
                 val urlRegister =
                     getInstruction<FiveRegisterInstruction>(urlIndex).registerD
-                val buildIndex = urlIndex + 1
+                val buildIndex = it.instructionMatches[1].index
                 val buildRegister =
                     getInstruction<OneRegisterInstruction>(buildIndex).registerA
 

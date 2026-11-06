@@ -7,7 +7,6 @@
 
 package app.morphe.patches.music.misc.audiovideoswitch
 
-import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patches.music.interaction.jam.ProtoAbi
 import app.morphe.patches.music.interaction.jam.QueueEnqueueFingerprint
 import app.morphe.patches.music.interaction.jam.QueueStorageAbi
@@ -18,7 +17,6 @@ import app.morphe.patches.music.interaction.jam.queueVideoIdFingerprint
 import app.morphe.patches.music.interaction.jam.resolveDisplays
 import app.morphe.patches.music.interaction.jam.resolveProto
 import app.morphe.patches.music.interaction.jam.resolveStorage
-import app.morphe.util.matchSingle
 import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
@@ -41,22 +39,20 @@ internal data class AudioVideoQueueAbi(
     val videoId: MethodReference,
 )
 
-internal fun BytecodePatchContext.resolveAudioVideoQueue(): AudioVideoQueueAbi {
-    val queueMatch = QueueEnqueueFingerprint.matchSingle()
+internal fun resolveAudioVideoQueue(): AudioVideoQueueAbi {
+    val queueMatch = QueueEnqueueFingerprint.match()
     val manager = queueMatch.originalClassDef
     val enqueue = queueMatch.originalMethod
     val command = resolveProto(
         enqueue.parameterTypes.singleOrNull()?.toString(),
         "queue command",
     )
-    val constructor =
-        queueManagerConstructorFingerprint(manager.type).matchSingle().originalMethod
-    val executor =
-        manager.fields.filter { it.type == EXECUTOR }.singleOrNull()
-            ?: error("Missing or ambiguous audio/video switch queue executor")
+    val constructor = queueManagerConstructorFingerprint(manager.type).originalMethod
+    val executor = manager.fields.singleOrNull { it.type == EXECUTOR }
+        ?: error("Missing or ambiguous audio/video switch queue executor")
     val storage = resolveStorage(manager, enqueue)
     val displays = resolveDisplays(manager, constructor, storage)
-    val remove = queueRemovalFingerprint(manager.type, displays).matchSingle().originalMethod
+    val remove = queueRemovalFingerprint(manager.type, displays).originalMethod
     val itemType = remove.parameterTypes.singleOrNull()?.toString()
     require(!itemType.isNullOrBlank() && itemType.startsWith("L")) {
         "Unable to resolve audio/video switch queue item type"

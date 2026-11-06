@@ -1,6 +1,6 @@
 /*
  * Copyright 2026 Morphe.
- * https://github.com/MorpheApp/morphe-patches
+ * https://github.com/MorpheApp/morphe-patches/pull/3862
  *
  * Original hard forked code:
  * https://github.com/ReVanced/revanced-patches/commit/724e6d61b2ecd868c1a9a37d465a688e83a74799
@@ -12,7 +12,8 @@ package app.morphe.patches.youtube.layout.returnyoutubedislike
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.patch
+import app.morphe.patcher.util.getFreeRegisterProvider
 import app.morphe.patches.shared.layout.returnyoutubedislike.DislikeFingerprint
 import app.morphe.patches.shared.layout.returnyoutubedislike.EndpointServiceNameFingerprint
 import app.morphe.patches.shared.layout.returnyoutubedislike.hookLikeDislikeButtons
@@ -27,6 +28,7 @@ import app.morphe.patches.shared.misc.textcomponent.hookLithoSpannableString
 import app.morphe.patches.shared.misc.textcomponent.lithoSpannableStringPatch
 import app.morphe.patches.shared.misc.textcomponent.textComponentPatch
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
+import app.morphe.patches.youtube.misc.feedcards.feedVideoCardsHookPatch
 import app.morphe.patches.youtube.misc.fix.videoactionbar.restoreOldVideoActionBarPatch
 import app.morphe.patches.youtube.misc.playertype.playerTypeHookPatch
 import app.morphe.patches.youtube.misc.settings.PreferenceScreen
@@ -35,17 +37,15 @@ import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.patches.youtube.video.videoid.hookPlayerResponseVideoId
 import app.morphe.patches.youtube.video.videoid.hookVideoId
 import app.morphe.patches.youtube.video.videoid.videoIdPatch
-import app.morphe.util.getFreeRegisterProvider
-import app.morphe.util.getReference
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
-import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 
 private const val EXTENSION_CLASS =
     "Lapp/morphe/extension/youtube/patches/ReturnYouTubeDislikePatch;"
 
-val returnYouTubeDislikePatch = bytecodePatch(
+val returnYouTubeDislikePatch = patch(
     name = "Return YouTube Dislike",
-    description = "Adds an option to show the dislike count of videos with Return YouTube Dislike."
+    description = "Adds an option to show the dislike count of videos with Return YouTube Dislike, " +
+            "and the like count and like ratio on the thumbnails of feed videos."
 ) {
     dependsOn(
         settingsPatch,
@@ -54,7 +54,9 @@ val returnYouTubeDislikePatch = bytecodePatch(
         lithoSpannableStringPatch,
         videoIdPatch,
         playerTypeHookPatch,
-        restoreOldVideoActionBarPatch
+        restoreOldVideoActionBarPatch,
+        // Finds the feed video cards for the like counts on their thumbnails.
+        feedVideoCardsHookPatch,
     )
 
     compatibleWith(COMPATIBILITY_YOUTUBE)
@@ -63,6 +65,8 @@ val returnYouTubeDislikePatch = bytecodePatch(
         PreferenceScreen.RETURN_YOUTUBE_DISLIKE.addPreferences(
             SwitchPreference("morphe_ryd_enabled"),
             SwitchPreference("morphe_ryd_dislike_percentage", summary = true),
+            SwitchPreference("morphe_ryd_feed_like_count"),
+            SwitchPreference("morphe_ryd_feed_like_ratio"),
             SwitchPreference("morphe_ryd_estimated_like", summary = true),
             SwitchPreference("morphe_ryd_toast_on_connection_error", summary = true),
             screenInfoPreferenceCategory(
@@ -96,10 +100,10 @@ val returnYouTubeDislikePatch = bytecodePatch(
         // region Hook like/dislike/remove like button clicks to send votes to the API.
 
         val endPointServiceNameField = EndpointServiceNameFingerprint
-            .instructionMatches.last().instruction.getReference<FieldReference>()!!
+            .instructionMatches.last().fieldReference
         val likeEndpointParserClass = DislikeFingerprint.classDef.superclass!!
         val videoIdField = requestParameterCheckFingerprint(likeEndpointParserClass)
-            .instructionMatches.last().instruction.getReference<FieldReference>()!!
+            .instructionMatches.last().fieldReference
 
         likeEndpointParserFingerprint(likeEndpointParserClass).let {
             it.method.apply {

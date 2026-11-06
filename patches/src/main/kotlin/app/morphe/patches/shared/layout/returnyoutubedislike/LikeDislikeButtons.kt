@@ -9,7 +9,8 @@ package app.morphe.patches.shared.layout.returnyoutubedislike
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
-import app.morphe.patcher.patch.BytecodePatchContext
+import app.morphe.patcher.patch.classDefBy
+import app.morphe.patches.shared.misc.litho.relayout.COMPONENT_HOST_CLASS
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 
 /**
@@ -18,18 +19,18 @@ import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
  *
  * @param extensionClass The class with onComponentHostContentDescription and onYogaSetWidth.
  */
-internal fun BytecodePatchContext.hookLikeDislikeButtons(extensionClass: String) {
+internal fun hookLikeDislikeButtons(extensionClass: String) {
     // Verify stubbed classes are not obfuscated.
-    classDefBy("Lcom/facebook/litho/ComponentHost;")
+    classDefBy(COMPONENT_HOST_CLASS)
     classDefBy("Lcom/facebook/litho/TextContent;")
-    classDefBy("Lcom/facebook/yoga/YogaNative;")
+    classDefBy(YOGA_NATIVE_CLASS)
 
     // The compact action bar has icon only like and dislike buttons with no text to hook,
     // so the counts are drawn over the button host views, which are found by their view tag.
     ComponentHostSetContentDescriptionFingerprint.method.addInstructions(
         0,
         """
-            invoke-static { p0, p1 }, $extensionClass->onComponentHostContentDescription(Lcom/facebook/litho/ComponentHost;Ljava/lang/CharSequence;)Ljava/lang/CharSequence;
+            invoke-static { p0, p1 }, $extensionClass->onComponentHostContentDescription(${COMPONENT_HOST_CLASS}Ljava/lang/CharSequence;)Ljava/lang/CharSequence;
             move-result-object p1
         """
     )

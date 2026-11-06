@@ -8,19 +8,15 @@
 package app.morphe.patches.shared.misc.settingsmenu
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
-import app.morphe.patcher.patch.BytecodePatchContext
+import app.morphe.patcher.patch.mutableClassDefByOrNull
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
-import app.morphe.patcher.util.smali.ExternalLabel
-import app.morphe.util.getReference
+import app.morphe.util.toPublicAccessFlags
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
-import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 
-private const val PREFERENCE_GROUP_CLASS = "Landroidx/preference/PreferenceGroup;"
-private const val PREFERENCE_CLASS = "Landroidx/preference/Preference;"
 internal const val SETTINGS_MENU_FILTER_CLASS = "Lapp/morphe/extension/shared/patches/BaseSettingsMenuFilter;"
 
 /**
@@ -32,15 +28,13 @@ internal const val HIDE_MATCHING_METHOD =
 /**
  * Catches async title assignments that skip the tree walk.
  */
-internal fun BytecodePatchContext.injectSettingsMenuFilterHook(extensionClass: String) {
+internal fun injectSettingsMenuFilterHook(extensionClass: String) {
     val setVisible = PreferenceSetVisibleFingerprint.method
     val visibleField = PreferenceSetVisibleFingerprint.let {
-        it.instructionMatches.first().instruction.getReference<FieldReference>()!!
+        it.instructionMatches.first().fieldReference
     }
 
     PreferenceSetTitleFingerprint.method.apply {
-        val firstInstruction = implementation!!.instructions.first()
-
         addInstructionsWithLabels(
             0,
             """
@@ -61,8 +55,10 @@ internal fun BytecodePatchContext.injectSettingsMenuFilterHook(extensionClass: S
 
                 const/4 v0, 0x0
                 invoke-virtual { p0, v0 }, $setVisible
-            """,
-            ExternalLabel("original", firstInstruction)
+
+                :original
+                nop
+            """
         )
     }
 }
@@ -72,14 +68,14 @@ internal fun BytecodePatchContext.injectSettingsMenuFilterHook(extensionClass: S
  * for XML-inflated titles, and private CharSequence fields are widened first because a
  * subclass method on PreferenceGroup cannot access them otherwise.
  */
-internal fun BytecodePatchContext.injectHideMatchingHelper() {
+internal fun injectHideMatchingHelper() {
     val listField = PreferenceGroupGetPreferenceFingerprint.let {
-        it.instructionMatches.last().instruction.getReference<FieldReference>()!!
+        it.instructionMatches.last().fieldReference
     }
     val setVisible = PreferenceSetVisibleFingerprint.method
     // mVisible: guards against duplicate work + drives the self-hide-when-all-children-invisible rule.
     val visibleField = PreferenceSetVisibleFingerprint.let {
-        it.instructionMatches.first().instruction.getReference<FieldReference>()!!
+        it.instructionMatches.first().fieldReference
     }
 
     val preferenceClass = mutableClassDefByOrNull(PREFERENCE_CLASS)
@@ -90,8 +86,7 @@ internal fun BytecodePatchContext.injectHideMatchingHelper() {
     }
     textFields.forEach { field ->
         if (AccessFlags.PRIVATE.isSet(field.accessFlags)) {
-            val flags = (field.accessFlags and AccessFlags.PRIVATE.value.inv()) or AccessFlags.PUBLIC.value
-            field.setAccessFlags(flags)
+            field.accessFlags = field.accessFlags.toPublicAccessFlags()
         }
     }
 

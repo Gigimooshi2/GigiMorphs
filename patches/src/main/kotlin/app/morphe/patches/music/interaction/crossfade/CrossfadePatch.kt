@@ -17,7 +17,11 @@ import app.morphe.patcher.fieldAccess
 import app.morphe.patcher.literal
 import app.morphe.patcher.methodCall
 import app.morphe.patcher.opcode
-import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.classDefBy
+import app.morphe.patcher.patch.classDefForEach
+import app.morphe.patcher.patch.mutableClassDefBy
+import app.morphe.patcher.patch.patch
+import app.morphe.patcher.util.getReference
 import app.morphe.patcher.util.proxy.mutableTypes.MutableClass
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.morphe.patches.music.misc.extension.sharedExtensionPatch
@@ -31,7 +35,6 @@ import app.morphe.patches.shared.misc.settings.preference.NonInteractivePreferen
 import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
 import app.morphe.patches.shared.misc.settings.preference.screenInfoPreferenceCategory
-import app.morphe.util.getReference
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
@@ -70,7 +73,6 @@ private const val VIDEO_TOGGLE_INTERFACE =
 private const val DELEGATE_INTERFACE =
     $$"Lapp/morphe/extension/music/patches/CrossfadePatch$DelegateAccess;"
 
-private const val EXO_PLAYER_TYPE = "Landroidx/media3/exoplayer/ExoPlayer;"
 
 private fun MutableClass.addBridge(
     name: String,
@@ -106,7 +108,7 @@ private fun MutableClass.addFieldSetter(methodName: String, fieldRef: FieldRefer
 }
 
 @Suppress("unused")
-val crossfadePatch = bytecodePatch(
+val crossfadePatch = patch(
     name = "Crossfade",
     description = "Adds a true dual-player crossfade between consecutive tracks.",
 ) {
@@ -271,10 +273,11 @@ val crossfadePatch = bytecodePatch(
             val sleepTimerStateType = SleepTimerStateFingerprint.classDef.type
             // The UI also has a (state)V method, the timer manager is the class with the getter too.
             Fingerprint(
+                isStatic = false,
                 returnType = "V",
                 parameters = listOf(sleepTimerStateType),
-                custom = { method, classDef ->
-                    !AccessFlags.STATIC.isSet(method.accessFlags) && classDef.methods.any {
+                custom = { _, classDef ->
+                    classDef.methods.any {
                         it.parameterTypes.isEmpty() && it.returnType == sleepTimerStateType
                     }
                 }
@@ -386,10 +389,11 @@ val crossfadePatch = bytecodePatch(
 
         val sharedStateClass = if (AccessFlags.INTERFACE.isSet(sharedStateInterfaceClass.accessFlags)) {
             Fingerprint(
+                name = "<init>",
+                interfaces = listOf(sharedStateFieldRef.type),
                 custom = { _, classDef ->
                     !AccessFlags.INTERFACE.isSet(classDef.accessFlags)
                             && !AccessFlags.ABSTRACT.isSet(classDef.accessFlags)
-                            && sharedStateFieldRef.type in classDef.interfaces
                 }
             ).classDef
         } else {
@@ -405,6 +409,7 @@ val crossfadePatch = bytecodePatch(
             || AccessFlags.ABSTRACT.isSet(sharedCallbackInterfaceClass.accessFlags)
         ) {
             Fingerprint(
+                name = "<init>",
                 custom = { _, classDef ->
                     !AccessFlags.INTERFACE.isSet(classDef.accessFlags)
                             && !AccessFlags.ABSTRACT.isSet(classDef.accessFlags)
@@ -443,6 +448,7 @@ val crossfadePatch = bytecodePatch(
         }
 
         val videoSurfaceClass = Fingerprint(
+            name = "<init>",
             custom = { _, classDef ->
                 !AccessFlags.INTERFACE.isSet(classDef.accessFlags)
                         && classDef.fields.any {
@@ -583,6 +589,7 @@ val crossfadePatch = bytecodePatch(
         // PlaybackInfo. The interface check rules out the internal player, which has similar fields.
         val exoImplFields = allFieldsInHierarchy(exoPlayerImplClass.type)
         val playbackInfoClass = Fingerprint(
+            name = "<init>",
             custom = { _, classDef ->
                 classDef.interfaces.isEmpty()
                         && classDef.fields.count { it.type == "I" } >= 3
@@ -1116,14 +1123,14 @@ val crossfadePatch = bytecodePatch(
 
         val setStateMethodFingerprint = Fingerprint(
             definingClass = stateProviderClass.type,
+            isStatic = false,
             returnType = "V",
             parameters = listOf(stateType),
             filters = listOf(
                 opcode((Opcode.IGET_OBJECT))
             ),
             custom = { method, _ ->
-                !AccessFlags.STATIC.isSet(method.accessFlags) &&
-                        !AccessFlags.CONSTRUCTOR.isSet(method.accessFlags)
+                !AccessFlags.CONSTRUCTOR.isSet(method.accessFlags)
             }
         )
         val setStateMethod = setStateMethodFingerprint.method

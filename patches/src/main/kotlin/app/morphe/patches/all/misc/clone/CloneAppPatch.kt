@@ -30,19 +30,16 @@ import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.methodCall
-import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.Option
 import app.morphe.patcher.patch.OptionException
 import app.morphe.patcher.patch.booleanOption
-import app.morphe.patcher.patch.bytecodePatch
-import app.morphe.patcher.patch.resourcePatch
+import app.morphe.patcher.patch.packageMetadata
+import app.morphe.patcher.patch.patch
+import app.morphe.patcher.patch.resourceXml
 import app.morphe.patcher.patch.stringOption
-import app.morphe.util.asSequence
-import app.morphe.util.findElementByAttributeValue
-import app.morphe.util.findInstructionIndicesReversedOrThrow
+import app.morphe.patcher.util.matchAllMethodIndicesForEach
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
-import org.w3c.dom.Element
 import java.util.logging.Logger
 
 private const val PACKAGE_NAME_REDDIT = "com.reddit.frontpage"
@@ -70,7 +67,6 @@ fun setOrGetFallbackPackageName(fallbackPackageName: String): String {
 /**
  * Selectively changes usage of Context.getPackageName() to the original package name.
  */
-context(patchContext: BytecodePatchContext)
 private fun applyGetPackageName(oldPackageName: String, classToChange: String) {
     val filter = methodCall(
         opcode = Opcode.INVOKE_VIRTUAL,
@@ -82,32 +78,28 @@ private fun applyGetPackageName(oldPackageName: String, classToChange: String) {
     Fingerprint(
         definingClass = classToChange,
         filters = listOf(filter)
-    ).matchAllOrNull()?.forEach { match ->
-        match.method.apply {
-            findInstructionIndicesReversedOrThrow(filter).forEach { index ->
-                val moveResultIndex = index + 1
+    ).matchAllMethodIndicesForEach { index ->
+        val moveResultIndex = index + 1
 
-                // Ignore calls to getPackageName() that do not use the return value.
-                val returnInstruction = getInstruction(moveResultIndex)
-                if (returnInstruction.opcode != Opcode.MOVE_RESULT_OBJECT) {
-                    return@forEach
-                }
-
-                val register = (returnInstruction as OneRegisterInstruction).registerA
-                replaceInstruction(
-                    moveResultIndex,
-                    """
-                        # Replace return-object with constant string
-                        const-string v$register, "$oldPackageName"
-                    """
-                )
-            }
+        // Ignore calls to getPackageName() that do not use the return value.
+        val returnInstruction = getInstruction(moveResultIndex)
+        if (returnInstruction.opcode != Opcode.MOVE_RESULT_OBJECT) {
+            return@matchAllMethodIndicesForEach
         }
+
+        val register = (returnInstruction as OneRegisterInstruction).registerA
+        replaceInstruction(
+            moveResultIndex,
+            """
+                # Replace return-object with constant string
+                const-string v$register, "$oldPackageName"
+            """
+        )
     }
 }
 
 @Suppress("unused")
-val cloneAppPatch = resourcePatch(
+val cloneAppPatch = patch(
     name = "Clone app",
     description = "Changes the app package name to allow installing the same app multiple times. " +
             "By default \".morphe\" is appended to the package name. Each cloned install must " +
@@ -151,7 +143,7 @@ val cloneAppPatch = resourcePatch(
         }
     }
 
-    dependsOn(bytecodePatch {
+    dependsOn(patch {
         execute {
             when (val originalPackageName = packageMetadata.packageName) {
                 PACKAGE_NAME_REDDIT -> {
@@ -218,15 +210,14 @@ val cloneAppPatch = resourcePatch(
 
         val providerStringResources = mutableSetOf<String>()
 
-        document("AndroidManifest.xml").use { document ->
-            document.documentElement.setAttribute("package", newPackageName)
+        resourceXml("AndroidManifest.xml").use { manifest ->
+            manifest.root.setAttribute("package", newPackageName)
 
             if (applyUpdatePermissions) {
-                val permissions = document.getElementsByTagName("permission")
-                val usesPermissions = document.getElementsByTagName("uses-permission")
+                val usesPermissions = manifest.elements("uses-permission").toList()
 
-                permissions.asSequence().map { it as Element }.forEach {
-                    val oldName = it.getAttribute("android:name")
+                manifest.elements("permission").forEach {
+                    val oldName = it.attribute("android:name").orEmpty()
                     val newName = when {
                         oldName.startsWith('.') -> return@forEach
                         oldName.startsWith("$packageName.") -> oldName.replaceFirst(packageName, newPackageName)
@@ -235,18 +226,14 @@ val cloneAppPatch = resourcePatch(
                     it.setAttribute("android:name", newName)
 
                     // Update a corresponding <uses-permission> as well if it exists
-                    usesPermissions
-                        .findElementByAttributeValue("android:name", oldName)
+                    usesPermissions.firstOrNull { usesPermission -> usesPermission.attribute("android:name") == oldName }
                         ?.setAttribute("android:name", newName)
                 }
             }
 
             if (applyUpdateProviders) {
-                val providers =
-                    document.getElementsByTagName("provider").asSequence().map { it as Element }
-
-                for (provider in providers) {
-                    val authorities = provider.getAttribute("android:authorities").split(';')
+                for (provider in manifest.elements("provider")) {
+                    val authorities = provider.attribute("android:authorities").orEmpty().split(';')
                     val newAuthorities = authorities.map {
                         when {
                             it.startsWith("$packageName.") -> it.replaceFirst(packageName, newPackageName)
@@ -263,18 +250,16 @@ val cloneAppPatch = resourcePatch(
         }
 
         if (providerStringResources.isNotEmpty()) {
-            document("res/values/strings.xml").use { document ->
-                val children = document.documentElement.childNodes
-                for (i in 0 until children.length) {
-                    val node = children.item(i) as? Element ?: continue
+            resourceXml("res/values/strings.xml").use { strings ->
+                providerStringResources.forEach { name ->
+                    val string = strings.resourceOrNull(name) ?: return@forEach
+                    val authority = string.text
+                    if (authority.isEmpty()) return@forEach
 
-                    if (node.getAttribute("name") in providerStringResources) {
-                        val authority = node.textContent
-                        node.textContent = if (authority.startsWith("$packageName.")) {
-                            authority.replaceFirst(packageName, newPackageName)
-                        } else {
-                            "${newPackageName}_$authority"
-                        }
+                    string.text = if (authority.startsWith("$packageName.")) {
+                        authority.replaceFirst(packageName, newPackageName)
+                    } else {
+                        "${newPackageName}_$authority"
                     }
                 }
             }

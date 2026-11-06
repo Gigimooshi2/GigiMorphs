@@ -11,10 +11,12 @@
 package app.morphe.patches.youtube.misc.backgroundplayback
 
 import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.extensions.InstructionExtensions.instructions
-import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.mutableClassDefBy
+import app.morphe.patcher.patch.patch
+import app.morphe.patcher.util.getReference
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patches.shared.misc.fix.bitmap.fixRecycledBitmapPatch
 import app.morphe.patches.shared.misc.settings.preference.ListPreference
@@ -26,6 +28,8 @@ import app.morphe.patches.youtube.misc.playservice.is_20_29_or_greater
 import app.morphe.patches.youtube.misc.playservice.is_20_49_or_greater
 import app.morphe.patches.youtube.misc.playservice.is_21_15_or_greater
 import app.morphe.patches.youtube.misc.playservice.is_21_21_or_greater
+import app.morphe.patches.youtube.misc.playservice.is_21_23_or_greater
+import app.morphe.patches.youtube.misc.playservice.is_21_30_or_greater
 import app.morphe.patches.youtube.misc.playservice.is_21_36_or_greater
 import app.morphe.patches.youtube.misc.playservice.versionCheckPatch
 import app.morphe.patches.youtube.misc.settings.PreferenceScreen
@@ -35,19 +39,19 @@ import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.patches.youtube.video.information.onCreateHook
 import app.morphe.patches.youtube.video.information.videoInformationPatch
 import app.morphe.util.addInstructionsAtControlFlowLabel
+import app.morphe.util.containsLiteralInstruction
+import app.morphe.util.findInstructionIndicesReversed
 import app.morphe.util.findInstructionIndicesReversedOrThrow
-import app.morphe.util.getMutableMethod
-import app.morphe.util.getReference
 import app.morphe.util.insertLiteralOverride
-import app.morphe.util.matchSingle
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.util.MethodUtil
 
 private const val EXTENSION_CLASS =
     "Lapp/morphe/extension/youtube/patches/BackgroundPlaybackPatch;"
 
-val backgroundPlaybackPatch = bytecodePatch(
+val backgroundPlaybackPatch = patch(
     name = "Remove background playback restrictions",
     description = "Removes restrictions on background playback, including playing kids videos in the background.",
 ) {
@@ -78,7 +82,7 @@ val backgroundPlaybackPatch = bytecodePatch(
             BackgroundPlaybackManagerFingerprint to "isBackgroundPlaybackAllowed",
             BackgroundPlaybackManagerShortsFingerprint to "isBackgroundShortsPlaybackAllowed",
         ).forEach { (fingerprint, integrationsMethod) ->
-            fingerprint.matchSingle().method.apply {
+            fingerprint.method.apply {
                 findInstructionIndicesReversedOrThrow(Opcode.RETURN).forEach { index ->
                     val register = getInstruction<OneRegisterInstruction>(index).registerA
 
@@ -126,24 +130,52 @@ val backgroundPlaybackPatch = bytecodePatch(
         }
 
         // Enable background playback option in YouTube settings
-        BackgroundPlaybackSettingsFingerprint.originalMethod.apply {
-            val booleanCalls = instructions.filter {
-                it.getReference<MethodReference>()?.returnType == "Z"
-            }
-
-            booleanCalls[1].getReference<MethodReference>()!!
-                .getMutableMethod().addBackgroundPlaybackIsPatchEnabledHook()
+        val backgroundPlaybackAllowedMatch = if (is_21_23_or_greater) {
+            BackgroundPlaybackSettingsFingerprint.instructionMatches.first()
+        } else {
+            BackgroundPlaybackSettingsLegacyFingerprint.instructionMatches[1]
         }
+        backgroundPlaybackAllowedMatch.getMethodCalled().addBackgroundPlaybackIsPatchEnabledHook()
 
         // Prevents playback from resuming if it was interrupted from the notification
-        // and the app was subsequently brought to the foreground.
+        // and the app was subsequently brought to the foreground. The same flag resumes the video
+        // when a Short opened over it is closed, so it is only overridden where the main activity
+        // goes to the background and returns to the foreground, and the class that resumes
+        // the video keeps the value of the account
+        // (https://github.com/MorpheApp/morphe-patches/issues/2506).
         if (is_21_15_or_greater) {
-            AutomaticForegroundPlaybackResumeFeatureFlagFingerprint.matchAll().forEach {
-                it.apply {
-                    method.insertLiteralOverride(
-                        instructionMatches.first().index,
-                        "$EXTENSION_CLASS->isAutomaticForegroundPlaybackAllowed(Z)Z"
-                    )
+            val override = "$EXTENSION_CLASS->isAutomaticForegroundPlaybackAllowed(Z)Z"
+            // 21.29 and older read the flag with a single accessor method.
+            val flagAccessor = if (is_21_30_or_greater) {
+                null
+            } else {
+                AutomaticForegroundPlaybackResumeFeatureFlagFingerprint.method
+            }
+
+            PlayingWhenBackgroundedFingerprint.matchAll().map { it.classDef.type }.toSet().forEach { type ->
+                mutableClassDefBy(type).methods.forEach { method ->
+                    if (flagAccessor == null) {
+                        if (method.containsLiteralInstruction(AUTOMATIC_FOREGROUND_PLAYBACK_RESUME_FLAG)) {
+                            method.insertLiteralOverride(AUTOMATIC_FOREGROUND_PLAYBACK_RESUME_FLAG, override)
+                        }
+                        return@forEach
+                    }
+
+                    method.findInstructionIndicesReversed {
+                        MethodUtil.methodSignaturesMatch(
+                            getReference<MethodReference>() ?: return@findInstructionIndicesReversed false,
+                            flagAccessor
+                        )
+                    }.forEach { index ->
+                        val register = method.getInstruction<OneRegisterInstruction>(index + 1).registerA
+                        method.addInstructions(
+                            index + 2,
+                            """
+                                invoke-static { v$register }, $override
+                                move-result v$register
+                            """
+                        )
+                    }
                 }
             }
         }
