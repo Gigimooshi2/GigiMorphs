@@ -1,8 +1,8 @@
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/BackgroundPlaybackPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/BackgroundPlaybackPatch.java
-index bb6012c64..6c8d39630 100644
+index 821561a..d4dbcea 100644
 --- a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/BackgroundPlaybackPatch.java
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/BackgroundPlaybackPatch.java
-@@ -186,15 +186,41 @@ public class BackgroundPlaybackPatch {
+@@ -185,15 +185,41 @@ public class BackgroundPlaybackPatch {
          // 7. Close the Short
          // 8. Resume playing the regular video
          // 9. Minimize the app (PiP should appear)
@@ -47,7 +47,7 @@ index bb6012c64..6c8d39630 100644
       */
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiDontRecommendChannelPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiDontRecommendChannelPatch.java
 new file mode 100644
-index 000000000..15923d094
+index 0000000..15923d0
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiDontRecommendChannelPatch.java
 @@ -0,0 +1,265 @@
@@ -318,7 +318,7 @@ index 000000000..15923d094
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java
 new file mode 100644
-index 000000000..8b7cccfa2
+index 0000000..8b7cccf
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java
 @@ -0,0 +1,294 @@
@@ -618,7 +618,7 @@ index 000000000..8b7cccfa2
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java
 new file mode 100644
-index 000000000..7521e1c53
+index 0000000..7521e1c
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java
 @@ -0,0 +1,87 @@
@@ -711,10 +711,10 @@ index 000000000..7521e1c53
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUploadLogsPreference.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUploadLogsPreference.java
 new file mode 100644
-index 000000000..0ca6abadf
+index 0000000..c0bb435
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUploadLogsPreference.java
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,35 @@
 +package app.morphe.extension.youtube.patches;
 +
 +import android.content.Context;
@@ -724,6 +724,12 @@ index 000000000..0ca6abadf
 +/** GigiMorphs: "Upload logs now" button. */
 +@SuppressWarnings({"unused", "deprecation"})
 +public class GigiUploadLogsPreference extends Preference {
++    static {
++        // Make sure the log settings are registered before the settings screen binds them.
++        // Otherwise opening the screen shows "Preference key has no setting" and they don't save.
++        Object unused = GigiLogUploadPatch.AUTO_CRASH;
++    }
++
 +    {
 +        setOnPreferenceClickListener(pref -> {
 +            GigiLogUploadPatch.uploadNow();
@@ -745,10 +751,10 @@ index 000000000..0ca6abadf
 +    }
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
-index 5b9a0b310..9aab20863 100644
+index 6b047e2..f4293a3 100644
 --- a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
-@@ -577,6 +577,16 @@ public final class FlyoutUtils {
+@@ -704,6 +704,16 @@ public final class FlyoutUtils {
              );
          }
  
@@ -762,11 +768,11 @@ index 5b9a0b310..9aab20863 100644
 +            );
 +        }
 +
-         if (nextButtonIndex > 0) {
-             addDivider(flyoutPanel, nextButtonIndex);
-         }
+         if (ExportDownloadButton.isPatchIncluded()) {
+             nextButtonIndex = ExportDownloadButton.addFlyoutButton(
+                     flyoutPanel,
 diff --git a/patches/build.gradle.kts b/patches/build.gradle.kts
-index 831d7ff19..226a37444 100644
+index 9f94115..329f891 100644
 --- a/patches/build.gradle.kts
 +++ b/patches/build.gradle.kts
 @@ -4,12 +4,12 @@ group = "app.morphe"
@@ -789,7 +795,7 @@ index 831d7ff19..226a37444 100644
  }
 diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/layout/flyout/GigiDontRecommendChannelPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/layout/flyout/GigiDontRecommendChannelPatch.kt
 new file mode 100644
-index 000000000..e034c95d5
+index 0000000..e034c95
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/youtube/layout/flyout/GigiDontRecommendChannelPatch.kt
 @@ -0,0 +1,30 @@
@@ -825,7 +831,7 @@ index 000000000..e034c95d5
 +}
 diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/layout/shortsplayer/GigiShortsFullVideoLinkPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/layout/shortsplayer/GigiShortsFullVideoLinkPatch.kt
 new file mode 100644
-index 000000000..7099b32b8
+index 0000000..7099b32
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/youtube/layout/shortsplayer/GigiShortsFullVideoLinkPatch.kt
 @@ -0,0 +1,34 @@
@@ -865,7 +871,7 @@ index 000000000..7099b32b8
 +}
 diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/misc/gigilogs/GigiLogUploadPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/misc/gigilogs/GigiLogUploadPatch.kt
 new file mode 100644
-index 000000000..94abdf489
+index 0000000..94abdf4
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/youtube/misc/gigilogs/GigiLogUploadPatch.kt
 @@ -0,0 +1,56 @@
@@ -926,13 +932,13 @@ index 000000000..94abdf489
 +    }
 +}
 diff --git a/patches/src/main/resources/addresources/values/youtube/strings.xml b/patches/src/main/resources/addresources/values/youtube/strings.xml
-index d64eb6c89..91cbced16 100644
+index 7909c20..d69b878 100644
 --- a/patches/src/main/resources/addresources/values/youtube/strings.xml
 +++ b/patches/src/main/resources/addresources/values/youtube/strings.xml
-@@ -1498,4 +1498,15 @@ Limitation: Reverts to old style \'More videos\' overlay"</string>
-     <string name="morphe_player_icon_style_entry_sharp" translatable="false">Sharp</string>
-     <string name="morphe_player_icon_style_entry_custom">Custom</string>
-     <string name="morphe_shorts_icon_style_title">Shorts icon style</string>
+@@ -1984,4 +1984,15 @@ Automatic recording is optional. It stops in incognito or when the account chang
+     <string name="morphe_live_chat_translate_max_length_title">Maximum message length</string>
+     <string name="morphe_live_chat_translate_max_length_summary">Longer messages are shown untranslated</string>
+     <string name="morphe_live_chat_translate_max_length_no_limit">No limit</string>
 +    <!-- misc.gigilogs.gigiLogUploadPatch (GigiMorphs) -->
 +    <string name="gigi_logs_screen_title" translatable="false">Upload logs (GigiMorphs)</string>
 +    <string name="gigi_logs_screen_summary" translatable="false">Send a log snapshot to a private GitHub repo</string>
