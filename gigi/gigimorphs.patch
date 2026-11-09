@@ -742,10 +742,10 @@ index 0000000..6f33f87
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUnplayableFallbackPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUnplayableFallbackPatch.java
 new file mode 100644
-index 0000000..f4b6ddc
+index 0000000..6de167d
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUnplayableFallbackPatch.java
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,198 @@
 +package app.morphe.extension.youtube.patches;
 +
 +import androidx.annotation.Nullable;
@@ -862,7 +862,12 @@ index 0000000..f4b6ddc
 +            if (cached != null && System.currentTimeMillis() - cached.time < REPLACEMENT_LIFETIME_MS) {
 +                return cached.bytes;
 +            }
-+            if (Utils.isCurrentlyOnMainThread() || !Utils.isNetworkConnected()) {
++            if (Utils.isCurrentlyOnMainThread()) {
++                // Nothing may be fetched on the main thread. A later model of the same video uses the cache.
++                Logger.printInfo(() -> "GigiMorphs: unplayable response on the main thread and nothing cached for: " + logVideoId);
++                return null;
++            }
++            if (!Utils.isNetworkConnected()) {
 +                return null;
 +            }
 +

@@ -114,7 +114,12 @@ public final class GigiUnplayableFallbackPatch {
             if (cached != null && System.currentTimeMillis() - cached.time < REPLACEMENT_LIFETIME_MS) {
                 return cached.bytes;
             }
-            if (Utils.isCurrentlyOnMainThread() || !Utils.isNetworkConnected()) {
+            if (Utils.isCurrentlyOnMainThread()) {
+                // Nothing may be fetched on the main thread. A later model of the same video uses the cache.
+                Logger.printInfo(() -> "GigiMorphs: unplayable response on the main thread and nothing cached for: " + logVideoId);
+                return null;
+            }
+            if (!Utils.isNetworkConnected()) {
                 return null;
             }
 
