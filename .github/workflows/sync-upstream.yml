@@ -26,14 +26,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/MorpheApp/morphe-patches.git
-          git fetch upstream main
-          up=$(git rev-parse upstream/main)
+          git fetch upstream dev
+          up=$(git rev-parse upstream/dev)
           if [ "$up" = "$(cat .gigi-upstream)" ]; then
             echo "Already up to date with $up"
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Rebuild the tree from upstream as a single commit (no upstream history pushed,
+          # Rebuild the tree from upstream dev as a single commit (no upstream history pushed,
           # so the default token never touches workflow files), keeping our own files.
           git rm -rq .
           git checkout "$up" -- .

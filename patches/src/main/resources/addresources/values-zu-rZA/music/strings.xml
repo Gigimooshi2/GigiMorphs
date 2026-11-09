@@ -490,6 +490,23 @@ Ukudlala kwe-SABR (Imifudumalo yevidiyo efakekile icishiwe)"</string>
   <string name="morphe_music_hide_navigation_bar_upgrade_button_title">Fihla inkinobho ye-Upgrade</string>
   <string name="morphe_music_hide_navigation_bar_title">Fihla ibhala lokuqondisa</string>
   <string name="morphe_music_hide_navigation_bar_labels_title">Fihla amagama amaqishi okuqondisa</string>
+  <string name="morphe_music_navigation_bar_glass_title">Vumela i-navigation bar yengilazi</string>
+  <string name="morphe_music_navigation_bar_glass_summary">Ikhombisa ibha yokuzula njengokhapshuli ethambile, eyindilinga, nebonakalayo</string>
+  <string name="morphe_music_navigation_bar_glass_opacity_title">Ukuphonsa kwengilazi</string>
+  <string name="morphe_music_navigation_bar_glass_opacity_summary">Lungisa izinga lokubonakala kwebha yokuzula yengilazi (0 kuyabonakala, 100 akubonakali)</string>
+  <string name="morphe_music_navigation_bar_glass_light_title">Ingilazi ekhanyayo</string>
+  <string name="morphe_music_navigation_bar_glass_light_summary">Yenza ibha yokuzula yengilazi ibe mhlophe esikhundleni sokuba mnyama, ukuze ingilazi ibe khanyayo futhi icace</string>
+  <string name="morphe_music_navigation_bar_glass_size_title">Usayizi webha yokuzula yengilazi</string>
+  <string name="morphe_music_navigation_bar_glass_size_summary">Lungisa ubude, ububanzi, nesikhala samabhathonu ebha yokuzula yengilazi, ngokusebenzisa isiboniso. Amabhathonu angakungeleki kububanzi besikrini ayafihleka</string>
+  <string name="morphe_music_navigation_bar_glass_size_height">Ubude</string>
+  <string name="morphe_music_navigation_bar_glass_size_width">Ububanzi obukhulu</string>
+  <string name="morphe_music_navigation_bar_glass_size_button_spacing">Isikhala samabhathonu</string>
+  <string name="morphe_music_navigation_bar_glass_size_buttons_shown">Izinkinobho ezibonakalayo: %1$s kwe-%2$s</string>
+  <!-- Labels of the preview, shown before the navigation bar was seen. Use the same localized wording YouTube Music displays for the tabs. -->
+  <string name="morphe_music_navigation_bar_glass_preview_home">Ikhaya</string>
+  <string name="morphe_music_navigation_bar_glass_preview_samples">Izibonelo</string>
+  <string name="morphe_music_navigation_bar_glass_preview_explore">Hlola</string>
+  <string name="morphe_music_navigation_bar_glass_preview_library">Ilayibrari</string>
   <!-- interaction.scrobbling.scrobblingPatch -->
   <string name="morphe_music_scrobbling_summary_logged_out">Awungenelele. Thinta ukuze ulungise</string>
   <string name="morphe_music_scrobbling_log_out">Phuma</string>
@@ -700,7 +717,7 @@ I-cookies ezidingekayo: SID, HSID, SSID, SAPISID, __Secure-3PAPISID, __Secure-1P
   <string name="morphe_music_lyrics_show_section_title">Khombisa ama-tag ezahlukweni</string>
   <string name="morphe_music_lyrics_show_section_summary">Labela isigaba esisha ngasinye semizila ngomaki omncane, njenge-Verse noma i-Chorus</string>
   <string name="morphe_music_lyrics_show_copy_button_title">Khombisa inkinobho ye-Copy</string>
-  <string name="morphe_music_lyrics_show_copy_button_summary">Thinta ukuze ukopishe amazwi aqala njengombhalo ojwayelekile; cindezela isikhathi eside ukuze ugcine ifayela lezisekelo zamazwi ku-Downloads</string>
+  <string name="morphe_music_lyrics_show_copy_button_summary">Thinta ukuze ukopishe amazwi aqala njengombhalo ojwayelekile; cindezela isikhathi eside ukuze ugcine ifayela lomthombo wamazwi kanye nefayela le-TTML eliguqukile ku-Downloads</string>
   <string name="morphe_music_lyrics_show_translate_button_title">Khombisa inkinobho ye-Translate</string>
   <string name="morphe_music_lyrics_show_translate_button_summary">Thinta ukuvula/ukuvala ukuhumusha; cindezela isikhathi eside ukuze uhumushe kuphela. Usebenzisa abahlinzeki bokuhumusha abivuliwe ngohlelo lwabo</string>
   <string name="morphe_music_lyrics_show_romanize_button_title">Khombisa inkinobho ye-Romanize noma i-Transliterate</string>
@@ -725,6 +742,7 @@ I-cookies ezidingekayo: SID, HSID, SSID, SAPISID, __Secure-3PAPISID, __Secure-1P
   <string name="morphe_music_lyrics_search_empty">Faka isihloko sengoma nomculi</string>
   <string name="morphe_music_lyrics_search_no_providers">Akukho ohlinzekileyo ovunyelwe ongakwazi ukufuna ezinye izingoma</string>
   <string name="morphe_music_lyrics_saved">Kugcinwe</string>
+  <string name="morphe_music_lyrics_written_by">Ibhalwe ngu: %s</string>
   <string name="morphe_music_lyrics_word_sync_title">Gqamisa amagama noma iziluku ezihambisana nomculo</string>
   <string name="morphe_music_lyrics_word_sync_summary">Nikela amagama amagama lapho etholakala. Lapho amazwi enesikhathi segama, agqamisa igama ngalinye noma isiluku ngesikhathi somculo</string>
   <string name="morphe_music_lyrics_line_scale_title">Nciphisa imigqa engasebenzi</string>
@@ -740,7 +758,7 @@ I-cookies ezidingekayo: SID, HSID, SSID, SAPISID, __Secure-3PAPISID, __Secure-1P
   <string name="morphe_music_lyrics_dynamic_background_animated_title">Yenza isizinda esishintshashintshayo sishintshe</string>
   <string name="morphe_music_lyrics_dynamic_background_animated_summary">Hambisa isizinda ngenkathi udlala, futhi usenze sishintshe ngokuhambisana nomculo uma i-YouTube Music inemvume yomakhalifoni. Cisha ukuze uthole isizinda esingashintshi esisebenzisa ibhethri kancane</string>
   <string name="morphe_music_lyrics_mediasession_title">Khombisa Amazwi eMediaSession esikrinini sokukhiya</string>
-  <string name="morphe_music_lyrics_mediasession_summary">Ikhombisa umugqa wamanje esikrinini sokukhiya, ku-Android Auto naku-Bluetooth. Kudingeka i-Android 11 noma entsha kakhulu</string>
+  <string name="morphe_music_lyrics_mediasession_summary">Ikhombisa umugqa wamanje esikrinini sokukhiya, ku-Android Auto nakwi-Bluetooth</string>
   <string name="morphe_music_lyrics_miniplayer_title">Khombisa amazwi eMiniplayer</string>
   <string name="morphe_music_lyrics_miniplayer_summary">Ikhombisa umugqa wamanje ku-miniplayer, kanti iculo liyiswa esikhonkweni sezincazelo</string>
   <string name="morphe_music_lyrics_mini_track_format_title">Ifomethi yesihloko sengoma/u-artist</string>
@@ -777,6 +795,8 @@ Sisebenza kuzo zombili izimiso. Ku-1.75, abalingiswa abane ababanikezelwe ububan
   <string name="morphe_music_lyrics_force_capitalize_summary">Enza uhlamvu lokuqala lwalowo mugqa wezinkondlo lube lukukhulu</string>
   <string name="morphe_music_lyrics_strip_trailing_punctuation_title">Susa izimpawu zokuloba ekugcineni</string>
   <string name="morphe_music_lyrics_strip_trailing_punctuation_summary">Isusa amaphuzu, amakhoma, amakholoni kanye namakhoma-aphuzu ekugcineni kwemigqa yezinkondlo. Izimpawu zombuzo, izimpawu zokumangala, amaphuzu aqhubekayo, izinkobe kanye nezibakatshana ziyagcinwa</string>
+  <string name="morphe_music_lyrics_han_form_title">Ukuguqula ifomu lesiShayina</string>
+  <string name="morphe_music_lyrics_han_form_summary">Uma ivuliwe, ilandela ulimi lwakho lokuhumusha ukuze iguqule amazwi phakathi kokubhala okwe-Simplified nokwe-Traditional</string>
   <string name="morphe_music_lyrics_text_size_title">Usayizi wombhalo</string>
   <string name="morphe_music_lyrics_text_size_summary">Usayizi wombhalo wamazwi engoma</string>
   <string name="morphe_music_lyrics_offset_ms_title">Isikhathi sokuhambisa somhlaba</string>
@@ -792,6 +812,7 @@ Sisebenza kuzo zombili izimiso. Ku-1.75, abalingiswa abane ababanikezelwe ububan
   <string name="morphe_music_lyrics_translated_by_ai">Ihunyushwe ngu %s</string>
   <string name="morphe_music_lyrics_romanized_by_ai">I-romaniziwe ngu %s</string>
   <string name="morphe_music_lyrics_romanized_by_local">I-Romanized ngu %s</string>
+  <string name="morphe_music_lyrics_with_ruby_provider">%1$s (no %2$s)</string>
   <string name="morphe_music_lyrics_romanized_by_rime">I-Romanized ngu Rime (%s)</string>
   <!-- Tappable label under the lyrics that turns the translation on. -->
   <string name="morphe_music_lyrics_translate_hide">Ihhumuliwe</string>
@@ -807,6 +828,8 @@ Sisebenza kuzo zombili izimiso. Ku-1.75, abalingiswa abane ababanikezelwe ububan
   <string name="morphe_romanize_language_DEFAULT">Ngokuzenzakalelayo</string>
   <string name="morphe_music_lyrics_romanizing">Kuhlelwa ngohlamvu lwe-Roman…</string>
   <string name="morphe_music_lyrics_romanize_failed">Kungekenzeki ukuhlela amazwi ngohlamvu lwe-Roman</string>
+  <string name="morphe_music_lyrics_romanize_language_none">Alukho</string>
+  <string name="morphe_music_lyrics_ruby_language_title">I-Ruby Target</string>
   <string name="morphe_music_lyrics_translate_only">Huhhumulwe kuphela</string>
   <string name="morphe_music_lyrics_romanize_only">I-Romanized kuphela</string>
   <string name="morphe_music_lyrics_dual_only">Imodi emibili</string>
@@ -837,7 +860,7 @@ Amazwi ingoma avela ezinkundleni zangaphandle ezingahlobene ne-Morphe, ezingaxha
   <string name="morphe_music_lyrics_hide_info_title">Fihla umugqa wemiklomelo</string>
   <string name="morphe_music_lyrics_hide_info_summary">Fihla umugqa wekredithi obonakala ngaphansi kwamazwi aqinile</string>
   <string name="morphe_music_lyrics_swap_trans_roma_title">Shintshisana ngohumusho nokubhala ngama-roman</string>
-  <string name="morphe_music_lyrics_swap_trans_roma_summary">Shintsha ukulandelana kokubonakala kokuhunyushwa nokubhala ngokulandelana kwemisindo ngaphansi kwamazwi engoma</string>
+  <string name="morphe_music_lyrics_swap_trans_roma_summary">Kuyisa ukuhunyushwa phezulu kwamazwi; ukufunda nokubhala kwe-romanization kusala phansi</string>
   <string name="morphe_music_lyrics_force_center_title">Hlala ubeka amazwi phakathi</string>
   <string name="morphe_music_lyrics_force_center_summary">U-ON ubeka wonke umugqa phakathi futhi ukufuna ukukhetha kokulungiswa komthombo, kuhlanganise nezinhlangothi ze-duet; u-OFF ugcina ukulungiswa amazwi aqashile</string>
   <string name="morphe_music_lyrics_providers_keep_one">Okukulungele ukuba okukodwa okubikeza kuhlele ukuhlala kuvulekile</string>
@@ -845,14 +868,7 @@ Amazwi ingoma avela ezinkundleni zangaphandle ezingahlobene ne-Morphe, ezingaxha
   <string name="morphe_music_lyrics_romanization_provider_title">I-Romanization noma i-transliteration</string>
   <string name="morphe_music_lyrics_romanization_provider_local">Isichazamazwi se-Offline</string>
   <string name="morphe_music_lyrics_romanization_provider_rime">Uhlu lwamagama lwe-Rime</string>
-  <string name="morphe_music_lyrics_ruby_provider_title">Ruby</string>
-  <string name="morphe_music_lyrics_ruby_provider_local">Isichazamazwi sangaphandle</string>
-  <string name="morphe_music_lyrics_ruby_style_title">I-script ye-Ruby</string>
-  <string name="morphe_music_lyrics_ruby_style_entry_hiragana">Hiragana (ひらがな)</string>
-  <string name="morphe_music_lyrics_ruby_style_entry_katakana">Katakana (カタカナ)</string>
-  <string name="morphe_music_lyrics_show_ruby_button_title">Inkinobho yeKhombisa i-Ruby</string>
-  <string name="morphe_music_lyrics_show_ruby_button_summary">Thinta ukuvala noma uvule ukufundwa kwe-ruby phezu kwamazwi; cindezela isikhathi eside ukuvutha phakathi kwe-hiragana ne-katakana. Isebenzisa abahlinzeki be-ruby abuvuliwe ngohlelo lwabo olubhalwe phansi</string>
-  <string name="morphe_music_lyrics_ruby_generating">Kukhiqizwa i-ruby…</string>
+  <string name="morphe_music_lyrics_romanization_provider_icu">I-ICU Transliterator</string>
   <string name="morphe_music_lyrics_use_ai_section_title">Thola izigaba nge-AI</string>
   <string name="morphe_music_lyrics_use_ai_section_summary">Kusetshenziswa kuphela lapho umhlinzeki engithumeli izilabelo zezigaba njenge-Chorus noma i-Verse, okuzotholwa yi-model yakho ehambisana ne-OpenAI. Ukuhlela umugqa kuvula i-prompt yawo</string>
   <string name="morphe_music_lyrics_ai_config_base_url_hint">URL ye-API endpoint (isib. https://api.openai.com/v1/chat/completions, https://api.anthropic.com/v1/chat/completions, https://generativelanguage.googleapis.com/v1beta/openai/chat/completions)</string>
@@ -875,6 +891,7 @@ Amazwi ingoma avela ezinkundleni zangaphandle ezingahlobene ne-Morphe, ezingaxha
   <string name="morphe_music_lyrics_ai_config_fetch_models_success">Khetha iModel</string>
   <string name="morphe_music_lyrics_ai_config_fetch_models_failed">Kuhleleke ukuthola amaModel. Hlola i-API key noma ukuxhumana.</string>
   <string name="morphe_music_lyrics_ai_config_prompt_label">I-Prompt</string>
+  <string name="morphe_music_lyrics_ai_config_ruby_prompt_label">I-Prompt ye-Ruby (Kana)</string>
   <string name="morphe_music_lyrics_ai_config_model_label">IModel</string>
   <string name="morphe_music_lyrics_ai_config_base_url_label">I-URL eyisisekelo</string>
   <string name="morphe_music_lyrics_ai_config_base_url_presets">Izilungiselelo zesevisi</string>
