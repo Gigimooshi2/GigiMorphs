@@ -177,7 +177,7 @@ public final class GigiLogUploadPatch {
         if (extra != null) sb.append("\n--- crash ---\n").append(extra).append('\n');
 
         sb.append("\n--- morphe log buffer");
-        if (!BaseSettings.DEBUG.get()) sb.append(" (Debug logging is off, so this is mostly empty)");
+        if (String.valueOf(BaseSettings.DEBUG_LEVEL.get()).toUpperCase(Locale.ROOT).contains("OFF")) sb.append(" (Debug logging is off, so this is mostly empty)");
         sb.append(" ---\n").append(Logger.getFilteredLogs()).append('\n');
 
         sb.append("\n--- logcat (this process, last ").append(LOGCAT_LINES).append(" lines, UI noise and morphe tag dropped) ---\n");
@@ -226,7 +226,7 @@ public final class GigiLogUploadPatch {
                 + "\nPatches: " + Utils.getPatchesReleaseVersion()
                 + "\nDevice: " + Build.MANUFACTURER + " " + Build.MODEL
                 + "\nAndroid: " + Build.VERSION.RELEASE + " (SDK " + Build.VERSION.SDK_INT + ")"
-                + "\nDebug logging: " + BaseSettings.DEBUG.get()
+                + "\nDebug logging: " + BaseSettings.DEBUG_LEVEL.get()
                 + "\n";
     }
 
