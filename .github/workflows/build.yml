@@ -43,9 +43,15 @@ jobs:
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
           chmod +x gradlew
-          ./gradlew buildAndroid --no-daemon --stacktrace
+          set -o pipefail
+          if ! ./gradlew buildAndroid --no-daemon --stacktrace 2>&1 | tee build.log; then
+            # Surface compile errors as annotations (readable via the API without the raw log).
+            grep -E "^e: |error:|What went wrong|> .*failed" build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1
+          fi
           ls -la patches/build/libs/
 
       - name: Create release
