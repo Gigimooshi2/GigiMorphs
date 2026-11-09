@@ -318,7 +318,7 @@ index 0000000..15923d0
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java
 new file mode 100644
-index 0000000..7a82c19
+index 0000000..9d02bfd
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java
 @@ -0,0 +1,316 @@
@@ -501,7 +501,7 @@ index 0000000..7a82c19
 +        if (extra != null) sb.append("\n--- crash ---\n").append(extra).append('\n');
 +
 +        sb.append("\n--- morphe log buffer");
-+        if (!BaseSettings.DEBUG.get()) sb.append(" (Debug logging is off, so this is mostly empty)");
++        if (String.valueOf(BaseSettings.DEBUG_LEVEL.get()).toUpperCase(Locale.ROOT).contains("OFF")) sb.append(" (Debug logging is off, so this is mostly empty)");
 +        sb.append(" ---\n").append(Logger.getFilteredLogs()).append('\n');
 +
 +        sb.append("\n--- logcat (this process, last ").append(LOGCAT_LINES).append(" lines, UI noise and morphe tag dropped) ---\n");
@@ -550,7 +550,7 @@ index 0000000..7a82c19
 +                + "\nPatches: " + Utils.getPatchesReleaseVersion()
 +                + "\nDevice: " + Build.MANUFACTURER + " " + Build.MODEL
 +                + "\nAndroid: " + Build.VERSION.RELEASE + " (SDK " + Build.VERSION.SDK_INT + ")"
-+                + "\nDebug logging: " + BaseSettings.DEBUG.get()
++                + "\nDebug logging: " + BaseSettings.DEBUG_LEVEL.get()
 +                + "\n";
 +    }
 +
@@ -773,10 +773,10 @@ index 0000000..c0bb435
 +    }
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
-index 6b047e2..f4293a3 100644
+index 736efce..1baf2e2 100644
 --- a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
-@@ -704,6 +704,16 @@ public final class FlyoutUtils {
+@@ -733,6 +733,16 @@ public final class FlyoutUtils {
              );
          }
  
@@ -954,10 +954,10 @@ index 0000000..94abdf4
 +    }
 +}
 diff --git a/patches/src/main/resources/addresources/values/youtube/strings.xml b/patches/src/main/resources/addresources/values/youtube/strings.xml
-index 7909c20..d69b878 100644
+index 8179a99..7db7219 100644
 --- a/patches/src/main/resources/addresources/values/youtube/strings.xml
 +++ b/patches/src/main/resources/addresources/values/youtube/strings.xml
-@@ -1984,4 +1984,15 @@ Automatic recording is optional. It stops in incognito or when the account chang
+@@ -2028,4 +2028,15 @@ Automatic recording is optional. It stops in incognito or when the account chang
      <string name="morphe_live_chat_translate_max_length_title">Maximum message length</string>
      <string name="morphe_live_chat_translate_max_length_summary">Longer messages are shown untranslated</string>
      <string name="morphe_live_chat_translate_max_length_no_limit">No limit</string>
