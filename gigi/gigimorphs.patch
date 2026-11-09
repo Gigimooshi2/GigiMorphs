@@ -318,10 +318,10 @@ index 0000000..15923d0
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java
 new file mode 100644
-index 0000000..8b7cccf
+index 0000000..7a82c19
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java
-@@ -0,0 +1,294 @@
+@@ -0,0 +1,316 @@
 +package app.morphe.extension.youtube.patches;
 +
 +import static java.lang.Boolean.TRUE;
@@ -504,21 +504,43 @@ index 0000000..8b7cccf
 +        if (!BaseSettings.DEBUG.get()) sb.append(" (Debug logging is off, so this is mostly empty)");
 +        sb.append(" ---\n").append(Logger.getFilteredLogs()).append('\n');
 +
-+        sb.append("\n--- logcat (this process, last ").append(LOGCAT_LINES).append(" lines) ---\n");
++        sb.append("\n--- logcat (this process, last ").append(LOGCAT_LINES).append(" lines, UI noise and morphe tag dropped) ---\n");
 +        try {
 +            java.lang.Process p = Runtime.getRuntime().exec(new String[]{
-+                    "logcat", "-d", "-v", "threadtime", "-t", String.valueOf(LOGCAT_LINES),
++                    "logcat", "-d", "-v", "threadtime", "-t", String.valueOf(LOGCAT_LINES * 10),
 +                    "--pid=" + Process.myPid()
 +            });
++            // Window/surface spam pushes the interesting lines (player errors) out of the window,
++            // and morphe lines are already in the buffer above. Drop both, keep the last LOGCAT_LINES.
++            java.util.ArrayDeque<String> kept = new java.util.ArrayDeque<>(LOGCAT_LINES);
 +            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
 +                String line;
-+                while ((line = r.readLine()) != null) sb.append(line).append('\n');
++                while ((line = r.readLine()) != null) {
++                    if (isLogcatNoise(line)) continue;
++                    if (kept.size() == LOGCAT_LINES) kept.removeFirst();
++                    kept.addLast(line);
++                }
 +            }
++            for (String line : kept) sb.append(line).append('\n');
 +            p.destroy();
 +        } catch (Exception ex) {
 +            sb.append("(logcat unavailable: ").append(ex).append(")\n");
 +        }
 +        return gzip(sb.toString());
++    }
++
++    private static final String[] LOGCAT_NOISE_TAGS = {
++            " morphe:", " VRI[", " SurfaceView", " SV[", " BLASTBufferQueue", " InsetsController",
++            " InsetsSourceConsumer", " ImeTracker", " InputTransport", " InputMethodManager",
++            " SurfaceComposerClient", " NativeCustomFrequencyManager", " AbsListView",
++            " WindowOnBackDispatcher", " ViewRootImpl", " HWUI", " perf_hint",
++    };
++
++    private static boolean isLogcatNoise(String line) {
++        for (String tag : LOGCAT_NOISE_TAGS) {
++            if (line.contains(tag)) return true;
++        }
++        return false;
 +    }
 +
 +    private static String header(Context app, String reason) {
