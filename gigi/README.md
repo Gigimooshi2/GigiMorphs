@@ -14,6 +14,8 @@ Add to Morphe Manager: https://morphe.software/add-source?github=Gigimooshi2/Gig
 
 - **Don't recommend channel for feed Shorts.** New patch: adds "Don't recommend channel" to the 3-dot menu of Shorts in the feed. It fetches the Short's player menu (`reel/reel_item_watch`), takes its "Don't recommend this channel" feedback token and sends it to `feedback`.
 
+- **Play videos YouTube refuses.** New patch: when YouTube answers the app's own video request with "unplayable" (the player shows "content unavailable") but the spoofed client can play the video, the app's player response is replaced with the spoofed client's response when the player response model is created. Needs Spoof video streams on. Videos played this way have no watch-history tracking, captions or seek previews. Every non-playable app response is logged with its status and reason ("GigiMorphs: app player response is not playable").
+
 ## How it works
 - `build.yml`: on push to main, builds the `.mpp`, creates a release, updates `patches-bundle.json`.
 - `sync-upstream.yml`: daily, rebuilds the tree from upstream `dev`, re-applies `gigimorphs.patch`, then builds. Fails loudly if the patch no longer applies.

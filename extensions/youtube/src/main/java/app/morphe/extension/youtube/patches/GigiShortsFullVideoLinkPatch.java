@@ -29,12 +29,21 @@ public final class GigiShortsFullVideoLinkPatch {
     private static volatile long reopeningTime;
 
     /**
+     * Last regular video the user opened, and when. Used by {@link GigiUnplayableFallbackPatch}.
+     */
+    public static volatile String lastIntentVideoId;
+    public static volatile long lastIntentTime;
+
+    /**
      * Injection point.
      *
      * @return true to cancel opening the video.
      */
     public static boolean onVideoIntentLoaded(Map<Object, Object> playbackStartDescriptorMap, String videoId) {
         try {
+            lastIntentVideoId = videoId;
+            lastIntentTime = System.currentTimeMillis();
+
             final boolean shortsOpen = ShortsPlayerState.isOpen();
             Logger.printDebug(() -> "GigiMorphs: video intent, videoId: " + videoId + " shortsOpen: " + shortsOpen);
 

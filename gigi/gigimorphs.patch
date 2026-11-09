@@ -640,10 +640,10 @@ index 0000000..9d02bfd
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java
 new file mode 100644
-index 0000000..7521e1c
+index 0000000..6f33f87
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,96 @@
 +package app.morphe.extension.youtube.patches;
 +
 +import android.app.Activity;
@@ -675,12 +675,21 @@ index 0000000..7521e1c
 +    private static volatile long reopeningTime;
 +
 +    /**
++     * Last regular video the user opened, and when. Used by {@link GigiUnplayableFallbackPatch}.
++     */
++    public static volatile String lastIntentVideoId;
++    public static volatile long lastIntentTime;
++
++    /**
 +     * Injection point.
 +     *
 +     * @return true to cancel opening the video.
 +     */
 +    public static boolean onVideoIntentLoaded(Map<Object, Object> playbackStartDescriptorMap, String videoId) {
 +        try {
++            lastIntentVideoId = videoId;
++            lastIntentTime = System.currentTimeMillis();
++
 +            final boolean shortsOpen = ShortsPlayerState.isOpen();
 +            Logger.printDebug(() -> "GigiMorphs: video intent, videoId: " + videoId + " shortsOpen: " + shortsOpen);
 +
@@ -728,6 +737,205 @@ index 0000000..7521e1c
 +        } catch (Exception ex) {
 +            Logger.printException(() -> "GigiMorphs: onVideoIntentLoaded failure", ex);
 +            return false;
++        }
++    }
++}
+diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUnplayableFallbackPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUnplayableFallbackPatch.java
+new file mode 100644
+index 0000000..f4b6ddc
+--- /dev/null
++++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUnplayableFallbackPatch.java
+@@ -0,0 +1,193 @@
++package app.morphe.extension.youtube.patches;
++
++import androidx.annotation.Nullable;
++
++import com.google.protobuf.MessageLite;
++
++import java.lang.reflect.Field;
++import java.util.Collections;
++import java.util.LinkedHashMap;
++import java.util.Map;
++
++import app.morphe.extension.shared.Logger;
++import app.morphe.extension.shared.Utils;
++import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.Format;
++import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.PlayabilityStatus;
++import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.PlayerConfig;
++import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.PlayerResponse;
++import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.Status;
++import app.morphe.extension.shared.innertube.PlayerResponseOuterClass.VideoDetails;
++import app.morphe.extension.shared.spoof.requests.StreamingDataRequest;
++
++/**
++ * GigiMorphs.
++ * <p>
++ * YouTube can answer the app's own video request with "unplayable" (the player then shows
++ * an error such as "content unavailable"), while another client is still allowed to play the same video.
++ * Spoof video streams only swaps the streams of a response that is already playable, so it cannot help there.
++ * <p>
++ * Fix: when the app builds its player response model from a response that is not playable,
++ * and the spoofed client has a playable response for that video, the spoofed response is used instead.
++ * The video then plays with the spoofed streams, without what only the app's own response carries
++ * (watch history tracking, captions, seek previews).
++ */
++@SuppressWarnings("unused")
++public final class GigiUnplayableFallbackPatch {
++
++    private static final long REPLACEMENT_LIFETIME_MS = 30 * 60 * 1000;
++    private static final long INTENT_VIDEO_ID_LIFETIME_MS = 20 * 1000;
++    private static final int MAX_CACHED = 8;
++
++    private record Replacement(byte[] bytes, long time) {
++    }
++
++    /**
++     * Replacements already built, so a model created again for the same video (also on the main thread,
++     * where nothing may be fetched) gets the same response.
++     */
++    private static final Map<String, Replacement> replacements = Collections.synchronizedMap(
++            new LinkedHashMap<>(MAX_CACHED, 0.75f, true) {
++                @Override
++                protected boolean removeEldestEntry(Map.Entry<String, Replacement> eldest) {
++                    return size() > MAX_CACHED;
++                }
++            });
++
++    /**
++     * Player config of the last playable response of the app itself. It fits the device,
++     * unlike the config of another client.
++     */
++    @Nullable
++    private static volatile PlayerConfig lastPlayableAppConfig;
++
++    @Nullable
++    private static volatile String lastToastVideoId;
++
++    /**
++     * Injection point.
++     * Called with the player response every player response model is created from.
++     *
++     * @return Bytes of the player response to use instead, or null to keep the response.
++     */
++    @Nullable
++    public static byte[] replaceUnplayablePlayerResponse(@Nullable Object playerProto) {
++        try {
++            if (!(playerProto instanceof MessageLite message)) {
++                return null;
++            }
++
++            PlayerResponse appResponse = PlayerResponse.parseFrom(message.toByteArray());
++            if (!appResponse.hasPlayabilityStatus()) {
++                return null;
++            }
++
++            PlayabilityStatus playability = appResponse.getPlayabilityStatus();
++            Status status = playability.getStatus();
++            if (status == Status.OK) {
++                if (appResponse.hasPlayerConfig() && appResponse.hasStreamingData()) {
++                    lastPlayableAppConfig = appResponse.getPlayerConfig();
++                }
++                return null;
++            }
++
++            String responseVideoId = appResponse.getVideoDetails().getVideoId();
++            String videoId = responseVideoId.isEmpty() ? lastRequestedVideoId() : responseVideoId;
++            final String logVideoId = videoId;
++            Logger.printInfo(() -> "GigiMorphs: app player response is not playable. status: " + status
++                    + " reason: " + playability.getReason()
++                    + " videoId: " + logVideoId + (responseVideoId.isEmpty() ? " (from last request)" : "")
++                    + " hasStreams: " + appResponse.hasStreamingData());
++
++            if (status != Status.UNPLAYABLE && status != Status.ERROR && status != Status.LOGIN_REQUIRED) {
++                return null;
++            }
++            if (!app.morphe.extension.shared.spoof.SpoofVideoStreamsPatch.isSpoofingEnabled()) {
++                Logger.printInfo(() -> "GigiMorphs: Spoof video streams is off, cannot replace the response");
++                return null;
++            }
++            if (videoId == null || videoId.isEmpty()) {
++                Logger.printInfo(() -> "GigiMorphs: no video id for the unplayable response");
++                return null;
++            }
++
++            Replacement cached = replacements.get(videoId);
++            if (cached != null && System.currentTimeMillis() - cached.time < REPLACEMENT_LIFETIME_MS) {
++                return cached.bytes;
++            }
++            if (Utils.isCurrentlyOnMainThread() || !Utils.isNetworkConnected()) {
++                return null;
++            }
++
++            StreamingDataRequest.StreamData streams = StreamingDataRequest.getOrFetchRequest(videoId).getStream();
++            if (streams == null) {
++                Logger.printInfo(() -> "GigiMorphs: no other client can play: " + logVideoId);
++                return null;
++            }
++
++            PlayerResponse.Builder builder = PlayerResponse.parseFrom(streams.streamingData()).toBuilder();
++            if (builder.getPlayabilityStatus().getStatus() != Status.OK || !builder.hasStreamingData()) {
++                return null;
++            }
++
++            // The app reads the video id and length from the video details,
++            // which the stream request of the other client does not ask for.
++            VideoDetails.Builder details = builder.getVideoDetails().toBuilder();
++            if (details.getVideoId().isEmpty()) {
++                details.setVideoId(videoId);
++            }
++            if (details.getLengthSeconds() <= 0) {
++                long durationMs = 0;
++                for (Format format : builder.getStreamingData().getAdaptiveFormatsList()) {
++                    durationMs = Math.max(durationMs, format.getApproxDurationMs());
++                }
++                if (durationMs > 0) {
++                    details.setLengthSeconds((int) (durationMs / 1000));
++                }
++            }
++            builder.setVideoDetails(details);
++
++            PlayerConfig appConfig = lastPlayableAppConfig;
++            if (appConfig != null) {
++                builder.setPlayerConfig(appConfig);
++            }
++
++            byte[] replacement = builder.build().toByteArray();
++            replacements.put(videoId, new Replacement(replacement, System.currentTimeMillis()));
++
++            Logger.printInfo(() -> "GigiMorphs: replaced unplayable player response of: " + logVideoId
++                    + " with the response of client: " + streams.client()
++                    + " lengthSeconds: " + details.getLengthSeconds()
++                    + " appConfig: " + (appConfig != null));
++            if (!videoId.equals(lastToastVideoId)) {
++                lastToastVideoId = videoId;
++                Utils.showToastShort("GigiMorphs: YouTube refused this video, playing it as " + streams.client());
++            }
++            return replacement;
++        } catch (Exception ex) {
++            Logger.printException(() -> "GigiMorphs: replaceUnplayablePlayerResponse failure", ex);
++            return null;
++        }
++    }
++
++    /**
++     * An unplayable response usually has no video details, so its video is taken from the last video
++     * the user opened, or else the last video the app requested.
++     */
++    @Nullable
++    private static String lastRequestedVideoId() {
++        String intentVideoId = GigiShortsFullVideoLinkPatch.lastIntentVideoId;
++        if (intentVideoId != null && !intentVideoId.isEmpty()
++                && System.currentTimeMillis() - GigiShortsFullVideoLinkPatch.lastIntentTime < INTENT_VIDEO_ID_LIFETIME_MS) {
++            return intentVideoId;
++        }
++        try {
++            Field field = VideoInformation.class.getDeclaredField("playerResponseVideoId");
++            field.setAccessible(true);
++            Object value = field.get(null);
++            return value instanceof String id ? id : null;
++        } catch (Exception ex) {
++            Logger.printDebug(() -> "GigiMorphs: could not read the last requested video id", ex);
++            return null;
 +        }
 +    }
 +}
@@ -951,6 +1159,200 @@ index 0000000..94abdf4
 +            0,
 +            "invoke-static/range { p0 .. p0 }, $EXTENSION_CLASS->install(Landroid/app/Activity;)V",
 +        )
++    }
++}
+diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/misc/spoof/GigiUnplayableFallbackPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/misc/spoof/GigiUnplayableFallbackPatch.kt
+new file mode 100644
+index 0000000..cbca852
+--- /dev/null
++++ b/patches/src/main/kotlin/app/morphe/patches/youtube/misc/spoof/GigiUnplayableFallbackPatch.kt
+@@ -0,0 +1,188 @@
++package app.morphe.patches.youtube.misc.spoof
++
++import app.morphe.patcher.Fingerprint
++import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
++import app.morphe.patcher.methodCall
++import app.morphe.patcher.opcode
++import app.morphe.patcher.patch.bytecodePatch
++import app.morphe.patcher.patch.classDefBy
++import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
++import app.morphe.patches.shared.misc.fix.proto.fixProtoLibraryPatch
++import app.morphe.patches.shared.misc.fix.proto.parseByteArrayWithRegistryMethodRef
++import app.morphe.patches.shared.misc.fix.proto.protoDefaultInstanceFingerprint
++import app.morphe.patches.shared.misc.spoof.CreateStreamingDataFingerprint
++import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
++import app.morphe.patches.youtube.misc.settings.settingsPatch
++import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
++import com.android.tools.smali.dexlib2.AccessFlags
++import com.android.tools.smali.dexlib2.Opcode
++import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
++import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
++import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
++
++private const val EXTENSION_CLASS =
++    "Lapp/morphe/extension/youtube/patches/GigiUnplayableFallbackPatch;"
++
++private const val GET_GENERATED_REGISTRY =
++    "Lcom/google/protobuf/ExtensionRegistryLite;->getGeneratedRegistry()Lcom/google/protobuf/ExtensionRegistryLite;"
++
++/**
++ * Creates a player response model from the bytes of a player response.
++ * Found in the player response model class, which is parcelable.
++ */
++private object GigiPlayerResponseModelFromBytesFingerprint : Fingerprint(
++    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.STATIC),
++    returnType = "L",
++    parameters = listOf("[B", "J"),
++    filters = listOf(
++        methodCall(
++            parameters = listOf("[B", "Lcom/google/protobuf/MessageLite;"),
++            returnType = "Lcom/google/protobuf/MessageLite;"
++        ),
++        opcode(Opcode.CHECK_CAST) // Player response.
++    ),
++    custom = { _, classDef ->
++        classDef.fields.any { it.name == "CREATOR" }
++    }
++)
++
++@Suppress("unused")
++val gigiUnplayableFallbackPatch = bytecodePatch(
++    name = "Play videos YouTube refuses",
++    description = "When YouTube answers the app's own video request with \"unplayable\" " +
++        "but the spoofed client can play the video, the video is played with the response " +
++        "of the spoofed client. Needs Spoof video streams to be on. (GigiMorphs)",
++) {
++    compatibleWith(COMPATIBILITY_YOUTUBE)
++
++    dependsOn(
++        sharedExtensionPatch,
++        settingsPatch,
++        fixProtoLibraryPatch,
++        spoofVideoStreamsPatch,
++    )
++
++    execute {
++        // The player response proto, which the streaming data is created from.
++        val playerProtoType = CreateStreamingDataFingerprint.method.parameterTypes.first().toString()
++        val modelClass = GigiPlayerResponseModelFromBytesFingerprint.classDef
++        val modelType = modelClass.type
++
++        // Static factory of the model class that creates the streaming data of a player response:
++        // (config, player response, response time) -> streaming data, or null if the response has no streams.
++        val streamingDataFactory = modelClass.methods.single { method ->
++            AccessFlags.STATIC.isSet(method.accessFlags)
++                    && method.parameterTypes.size == 3
++                    && method.parameterTypes[1].toString() == playerProtoType
++                    && method.parameterTypes[2].toString() == "J"
++                    && method.returnType.startsWith("L")
++        }
++        val streamingDataType = streamingDataFactory.returnType
++        val configType = streamingDataFactory.parameterTypes[0].toString()
++        val configDefaultField = classDefBy(configType).fields.first { field ->
++            field.type == configType && AccessFlags.STATIC.isSet(field.accessFlags)
++        }
++        val playerProtoDefaultInstance = protoDefaultInstanceFingerprint(playerProtoType)
++            .instructionMatches.first().fieldReference
++
++        // Returns the player response to use instead of the given one, or null to keep it.
++        val replaceHelper = ImmutableMethod(
++            modelType,
++            "patch_gigiReplaceUnplayable",
++            listOf(ImmutableMethodParameter(playerProtoType, null, null)),
++            playerProtoType,
++            AccessFlags.PUBLIC.value or AccessFlags.STATIC.value,
++            null,
++            null,
++            MutableMethodImplementation(4),
++        ).toMutable().apply {
++            addInstructionsWithLabels(
++                0,
++                """
++                    invoke-static { p0 }, $EXTENSION_CLASS->replaceUnplayablePlayerResponse(Ljava/lang/Object;)[B
++                    move-result-object v0
++                    if-nez v0, :replace
++                    const/4 v0, 0x0
++                    return-object v0
++                    :replace
++                    # The player config holds extensions, which are lost if parsed without the registry.
++                    sget-object v1, $playerProtoDefaultInstance
++                    invoke-static { }, $GET_GENERATED_REGISTRY
++                    move-result-object v2
++                    invoke-static { v1, v0, v2 }, ${parseByteArrayWithRegistryMethodRef.get()!!}
++                    move-result-object v0
++                    check-cast v0, $playerProtoType
++                    return-object v0
++                """
++            )
++        }
++        modelClass.methods.add(replaceHelper)
++
++        // Creates the streaming data of the replaced player response.
++        val streamingDataHelper = ImmutableMethod(
++            modelType,
++            "patch_gigiCreateStreamingData",
++            listOf(
++                ImmutableMethodParameter(playerProtoType, null, null),
++                ImmutableMethodParameter("J", null, null),
++            ),
++            streamingDataType,
++            AccessFlags.PUBLIC.value or AccessFlags.STATIC.value,
++            null,
++            null,
++            MutableMethodImplementation(4),
++        ).toMutable().apply {
++            addInstructionsWithLabels(
++                0,
++                """
++                    sget-object v0, $configType->${configDefaultField.name}:$configType
++                    invoke-static { v0, p0, p1, p2 }, $streamingDataFactory
++                    move-result-object v0
++                    return-object v0
++                """
++            )
++        }
++        modelClass.methods.add(streamingDataHelper)
++
++        // Every model is created with a constructor that is given the player response and its
++        // streaming data. The other constructors create the streaming data and call these.
++        val constructors = modelClass.methods.filter { method ->
++            method.name == "<init>"
++                    && method.parameterTypes.firstOrNull()?.toString() == playerProtoType
++                    && method.parameterTypes.any { it.toString() == streamingDataType }
++        }
++        check(constructors.isNotEmpty()) { "Player response model constructors not found" }
++
++        constructors.forEach { constructor ->
++            // Parameter registers, p0 is the model itself.
++            var register = 1
++            var timeRegister = -1
++            var streamingDataRegister = -1
++            constructor.parameterTypes.forEach { parameter ->
++                val type = parameter.toString()
++                if (type == "J" && timeRegister < 0) timeRegister = register
++                if (type == streamingDataType) streamingDataRegister = register
++                register += if (type == "J" || type == "D") 2 else 1
++            }
++            val localRegisters = constructor.implementation!!.registerCount - register
++            check(timeRegister > 0 && streamingDataRegister > 0 && localRegisters >= 1) {
++                "Unexpected player response model constructor: $constructor"
++            }
++
++            constructor.addInstructionsWithLabels(
++                0,
++                """
++                    invoke-static/range { p1 .. p1 }, $replaceHelper
++                    move-result-object v0
++                    if-eqz v0, :gigi_keep_player_response
++                    move-object/from16 p1, v0
++                    invoke-static { p1, p$timeRegister, p${timeRegister + 1} }, $streamingDataHelper
++                    move-result-object v0
++                    move-object/from16 p$streamingDataRegister, v0
++                    :gigi_keep_player_response
++                    nop
++                """
++            )
++        }
 +    }
 +}
 diff --git a/patches/src/main/resources/addresources/values/youtube/strings.xml b/patches/src/main/resources/addresources/values/youtube/strings.xml
