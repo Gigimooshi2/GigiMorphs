@@ -167,6 +167,28 @@ For at logge ind, tryk på fortsæt nedenfor"</string>
 • Dine Morphe indstillinger vil ikke importere/eksportere Android VR autentificering
 • Hvis denne app ikke bruges i 6 måneder, vil Google fjerne denne autentificering
 • Du skal logge ind igen, hvis du ændrer din Google-adgangskode eller deautoriserer denne enhed fra dine Google-instillinger"</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_title">Log ind via mobilweb</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary">Valgfrit: log ind på YouTube-webstedet for at afspille videoer med din konto. Tryk her for at fortsætte</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary_signed_in">Logget ind på mobilweb i øjeblikket</string>
+  <!-- "Default client" must be the same translated text as morphe_spoof_video_streams_client_type_title -->
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary_disabled">For at bruge denne funktion skal du ændre \'Standardklient\' til Mobil Web</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_dialog_title">Log ind på Mobil Web</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_dialog_not_signed_in_message">"Mobil Web afspiller videoer uden login, eller når der er logget ind på YouTube-webstedet
+
+• Når der er logget ind, kan videoer, der kræver en konto, afspilles, såsom aldersbegrænsede videoer
+• Googles login-side åbnes i denne app
+• Login bruges kun til at hente de videoer, du afspiller
+• Login gemmes kun på denne enhed
+
+Tryk på fortsæt nedenfor for at logge ind"</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_success_dialog_message">"Login gemt
+
+• Dine Morphe-indstillinger importerer/eksporterer ikke login til Mobil Web
+• Hvis Google afslutter sessionen, afspilles videoer uden login, indtil du logger ind igen
+• Udlogning logger også denne enhed ud af YouTube-webstedet"</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_expired">Indlogning på mobilweb er udløbet, prøv at logge ind på mobilweb igen</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_signed_out">Logget ud af mobilweb</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_webview_missing">Android System WebView er ikke tilgængelig. Installer eller aktiver den for at logge ind</string>
   <string name="morphe_oauth2_connection_failure_timeout">OAuth2 er midlertidigt utilgængelig (API timeout)</string>
   <string name="morphe_oauth2_connection_failure_status_400">Android VR-indlogning er udløbet, prøv at logge ind på VR igen</string>
   <string name="morphe_oauth2_connection_failure_status">OAuth2 er midlertidigt utilgængelig (status %s)</string>
@@ -232,6 +254,20 @@ For at logge ind, tryk på fortsæt nedenfor"</string>
   <string name="morphe_replace_music_with_youtube_summary">Erstatter music.youtube.com med youtube.com i delte links.</string>
   <string name="morphe_replace_links_with_shortener_title">Skift delingslinks til youtu.be</string>
   <string name="morphe_replace_links_with_shortener_summary">Tvinger videoer til at bruge det forkortede youtu.be URL-format</string>
+  <!-- video.quality.rememberVideoQualityPatch -->
+  <!-- Translations should match the language used in 'morphe_custom_playback_speeds_auto'. -->
+  <string name="morphe_video_quality_default_entry_1">Automatisk</string>
+  <string name="morphe_remember_video_quality_last_selected_title">Husk videokvalitet</string>
+  <string name="morphe_remember_video_quality_last_selected_summary">Anvender dit manuelle valg af kvalitet på alle fremtidige videoer</string>
+  <string name="morphe_remember_video_quality_last_selected_toast_title">Meddelelser om ændring af kvalitet</string>
+  <string name="morphe_remember_video_quality_last_selected_toast_summary">Viser en meddelelse, når en ny standardkvalitet gemmes</string>
+  <string name="morphe_video_quality_default_wifi_title">Standard videokvalitet på Wi-Fi-netværk</string>
+  <string name="morphe_video_quality_default_mobile_title">Standard videokvalitet på mobilnetværk</string>
+  <string name="morphe_remember_video_quality_toast_mobile">Ændrede standard mobilkvalitet til: %s</string>
+  <string name="morphe_remember_video_quality_toast_wifi">Ændrede standard Wi-Fi-kvalitet til: %s</string>
+  <!-- misc.sharesheet.openSystemShareSheetPatch -->
+  <string name="morphe_open_system_share_sheet_title">Åbn systemets delingsark</string>
+  <string name="morphe_open_system_share_sheet_summary">Åbner systemets delingsmenu i stedet for den i appen, når der deles indhold</string>
   <!-- misc.debugging.enableDebuggingPatch -->
   <string name="morphe_debug_litho_title">Litho-logning</string>
   <string name="morphe_debug_litho_entry_disabled">Deaktiveret</string>

@@ -167,6 +167,28 @@ Pritisnite \"nadaljujte\", da se prijavite"</string>
 • Vaše nastavitve Morphe ne bodo uvažale/izvažale avtentikacije Android VR.
 • Če te aplikacijo ne boste uporabljali 6 mesecev, bo Google izbrisal to avtentikacijo.
 • Ponovno se boste morali prijaviti, če spremenite geslo Google ali odstranite napravo iz nastavitev Google"</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_title">Prijava preko mobilne spletne strani</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary">Neobvezno: prijavite se na spletno stran YouTube, da predvajate videoposnetke s svojim računom. Dotaknite se tukaj za nadaljevanje</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary_signed_in">Trenutno ste prijavljeni v mobilno spletno stran</string>
+  <!-- "Default client" must be the same translated text as morphe_spoof_video_streams_client_type_title -->
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary_disabled">Če želite uporabljati to funkcijo, spremenite \'Privzeti odjemalec\' v Mobile Web</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_dialog_title">Prijava v Mobile Web</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_dialog_not_signed_in_message">"Mobile Web predvaja videoposnetke brez prijave ali z prijavo na spletno mesto YouTube
+
+• Če ste prijavljeni, lahko predvajate videoposnetke, za katere je potreben račun, npr. videoposnetke z omejitvijo starosti
+• Stran za prijavo v račun Google se odpre v tej aplikaciji
+• Prijava se uporablja samo za pridobivanje videoposnetkov, ki jih predvajate
+• Prijava se shrani samo na tej napravi
+
+Za prijavo pritisnite spodnji gumb za nadaljevanje"</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_success_dialog_message">"Prijava shranjena
+
+• Nastavitve Morphe ne bodo uvozile/izvozile prijave v mobilno spletno različijo
+• Če Google zaključi prijavo, se videi predvajajo brez prijave, dokler se ponovno ne prijavite
+• Odjava hkrati odjavi to napravo tudi s spletne strani YouTube"</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_expired">Prijava v mobilno spletno različijo je potekla, poskusite se znova prijaviti v mobilno spletno različijo</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_signed_out">Odjavljeno iz mobilne spletne različije</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_webview_missing">Android System WebView ni na voljo. Namestite ga ali omogočite, da se lahko prijavite</string>
   <string name="morphe_oauth2_connection_failure_timeout">OAuth2 je začasno nedostopen (API je potekel)</string>
   <string name="morphe_oauth2_connection_failure_status_400">Iztek prijave v VR, poskusite se znova prijaviti v VR</string>
   <string name="morphe_oauth2_connection_failure_status">OAuth2 je začasno nedostopen (status %s)</string>
@@ -232,6 +254,20 @@ Pritisnite \"nadaljujte\", da se prijavite"</string>
   <string name="morphe_replace_music_with_youtube_summary">Nadomešča music.youtube.com z youtube.com v skupnih povezavah.</string>
   <string name="morphe_replace_links_with_shortener_title">Spremenite povezave za deljenje v youtu.be</string>
   <string name="morphe_replace_links_with_shortener_summary">Prisilno uporablja skrajšano obliko URL-jev youtu.be za videe</string>
+  <!-- video.quality.rememberVideoQualityPatch -->
+  <!-- Translations should match the language used in 'morphe_custom_playback_speeds_auto'. -->
+  <string name="morphe_video_quality_default_entry_1">Samodejno</string>
+  <string name="morphe_remember_video_quality_last_selected_title">Zapomni si kvaliteto videa</string>
+  <string name="morphe_remember_video_quality_last_selected_summary">Vaše ročno izbrano nastavitv kvalitete se uporabi za vse prihodnje videe</string>
+  <string name="morphe_remember_video_quality_last_selected_toast_title">Obvestila o spremembi kvalitete</string>
+  <string name="morphe_remember_video_quality_last_selected_toast_summary">Prikaže obvestilo, ko se shrani nova privzeta kvaliteta</string>
+  <string name="morphe_video_quality_default_wifi_title">Privzeta kvaliteta videa v Wi-Fi omrežju</string>
+  <string name="morphe_video_quality_default_mobile_title">Privzeta kvaliteta videa v mobilnem omrežju</string>
+  <string name="morphe_remember_video_quality_toast_mobile">Privzeta mobilna kvaliteta spremenjena v: %s</string>
+  <string name="morphe_remember_video_quality_toast_wifi">Privzeta Wi-Fi kvaliteta spremenjena v: %s</string>
+  <!-- misc.sharesheet.openSystemShareSheetPatch -->
+  <string name="morphe_open_system_share_sheet_title">Odpri sistemsko okno za deljenje</string>
+  <string name="morphe_open_system_share_sheet_summary">Odpre sistemsko okno za deljenje namesto vgrajenega pri deljenju vsebine</string>
   <!-- misc.debugging.enableDebuggingPatch -->
   <string name="morphe_debug_litho_title">Litho zapisovanje</string>
   <string name="morphe_debug_litho_entry_disabled">Onemogočeno</string>

@@ -167,6 +167,28 @@ Om in te loggen, druk je op 'doorgaan' onderaan"</string>
 • Je Morphe-instellingen importeren of exporteren de Android VR-authenticatie niet
 • Als deze app 6 maanden niet wordt gebruikt, verwijdert Google deze authenticatie
 • Je moet opnieuw inloggen als je je Google-wachtwoord wijzigt of dit apparaat verwijdert uit je Google-instellingen"</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_title">Aanmelden via mobiel web</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary">Optioneel: meld je aan bij de YouTube-website om video\'s met je account af te spelen. Tik hier om door te gaan</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary_signed_in">Momenteel aangemeld via mobiel web</string>
+  <!-- "Default client" must be the same translated text as morphe_spoof_video_streams_client_type_title -->
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary_disabled">Om deze functie te gebruiken, wijzig \'Standaard client\' naar Mobile Web</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_dialog_title">Meld u aan bij Mobile Web</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_dialog_not_signed_in_message">"Mobile Web speelt video's af zonder aanmelding, of aangemeld bij de YouTube-website
+
+• Wanneer u bent aangemeld, kunnen video's die een account vereisen worden afgespeeld, zoals video's met een leeftijdsbeperking
+• De Google-aanmeldingspagina wordt in deze app geopend
+• De aanmelding wordt alleen gebruikt om de video's op te halen die u afspeelt
+• De aanmelding wordt alleen op dit apparaat opgeslagen
+
+Om u aan te melden, drukt u hieronder op doorgaan"</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_success_dialog_message">"Aanmelding opgeslagen
+
+• Je Morphe-instellingen importeren/exporteren de aanmelding voor Mobile Web niet
+• Als Google de aanmelding beëindigt, worden video's afgespeeld zonder aanmelding totdat je opnieuw aanmeldt
+• Afmelden meldt dit apparaat ook af van de YouTube-website"</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_expired">Aanmelding voor Mobile Web is verlopen, probeer opnieuw aan te melden bij Mobile Web</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_signed_out">Afgemeld bij Mobile Web</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_webview_missing">Android System WebView is niet beschikbaar. Installeer of schakel het in om aan te melden</string>
   <string name="morphe_oauth2_connection_failure_timeout">OAuth2 is tijdelijk niet beschikbaar (API heeft time-out)</string>
   <string name="morphe_oauth2_connection_failure_status_400">Android VR inloggen is verlopen, probeer het nog eens</string>
   <string name="morphe_oauth2_connection_failure_status">OAuth2 is tijdelijk niet beschikbaar (status %s)</string>
@@ -232,6 +254,20 @@ Om in te loggen, druk je op 'doorgaan' onderaan"</string>
   <string name="morphe_replace_music_with_youtube_summary">Vervangt music.youtube.com door youtube.com in gedeelde links</string>
   <string name="morphe_replace_links_with_shortener_title">Deelkoppelingen wijzigen naar youtu.be</string>
   <string name="morphe_replace_links_with_shortener_summary">Dwingt video\'s om het verkorte youtu.be URL-formaat te gebruiken</string>
+  <!-- video.quality.rememberVideoQualityPatch -->
+  <!-- Translations should match the language used in 'morphe_custom_playback_speeds_auto'. -->
+  <string name="morphe_video_quality_default_entry_1">Automatisch</string>
+  <string name="morphe_remember_video_quality_last_selected_title">Videokwaliteit onthouden</string>
+  <string name="morphe_remember_video_quality_last_selected_summary">Past je handmatige kwaliteitsselectie toe op alle toekomstige video\'s</string>
+  <string name="morphe_remember_video_quality_last_selected_toast_title">Meldingen bij wijziging van kwaliteit</string>
+  <string name="morphe_remember_video_quality_last_selected_toast_summary">Toont een melding wanneer een nieuwe standaardkwaliteit is opgeslagen</string>
+  <string name="morphe_video_quality_default_wifi_title">Standaard videokwaliteit op wifi-netwerk</string>
+  <string name="morphe_video_quality_default_mobile_title">Standaard videokwaliteit op mobiel netwerk</string>
+  <string name="morphe_remember_video_quality_toast_mobile">Standaard mobiele kwaliteit gewijzigd naar: %s</string>
+  <string name="morphe_remember_video_quality_toast_wifi">Standaard wifi-kwaliteit gewijzigd naar: %s</string>
+  <!-- misc.sharesheet.openSystemShareSheetPatch -->
+  <string name="morphe_open_system_share_sheet_title">Systeemdeelblad openen</string>
+  <string name="morphe_open_system_share_sheet_summary">Opent het systeemdeelblad i.p.v. het ingebouwde deelblad bij het delen van content</string>
   <!-- misc.debugging.enableDebuggingPatch -->
   <string name="morphe_debug_litho_title">Litho-logboek</string>
   <string name="morphe_debug_litho_entry_disabled">Uitgeschakeld</string>

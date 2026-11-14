@@ -167,6 +167,30 @@ Para fazer login, pressione continuar abaixo"</string>
 • Suas configurações do Morphe não vão importar/exportar a autenticação do Android VR
 • Se este app não for usado por 6 meses, o Google removerá esta autenticação
 • Você precisará fazer o login novamente se alterar sua senha do Google ou desregistrar este dispositivo das configurações do Google"</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_title">Login via Web Mobile</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary">Opcional: faça o login através do site do YouTube para reproduzir vídeos com sua conta. Toque aqui para continuar </string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary_signed_in">Atualmente logado via Web Mobile</string>
+  <!-- "Default client" must be the same translated text as morphe_spoof_video_streams_client_type_title -->
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary_disabled">Para usar essa função, altere \"Cliente padrão\" para Web Mobile</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_dialog_title">Logar ao Web Mobile </string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_dialog_not_signed_in_message">"Web Mobile reproduz vídeos enquanto não logado, ou faça o login através do site do YouTube 
+
+• Logado, vídeos que precisam de uma conta podem ser reproduzidos, como vídeos com restrição de idade
+• A página de login so YouTube irá abrir no app
+• O login é usado apenas para obter os vídeos a reproduzir 
+• O login é salvo apenas neste dispositivo 
+
+Para logar-se, toque em continuar abaixo
+
+"</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_success_dialog_message">"Login salvo
+
+• Suas opções do Morphe não serão importadas/exportadas com o login Web Mobile 
+• Se o Google terminar o login, os vídeos serão reproduzidos de forma não logada até o próximo login
+• Terminar o login também desloga este dispositivo do site do YouTube "</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_expired">Login Web Mobile expirou, tente logar-se via Web Mobile novamente </string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_signed_out">Deslogar-se do Web Mobile </string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_webview_missing">Android System WebView não disponível. Instale-o ou habilite-o para logar-se </string>
   <string name="morphe_oauth2_connection_failure_timeout">OAuth2 está temporariamente indisponível (API expirou)</string>
   <string name="morphe_oauth2_connection_failure_status_400">O login do Android VR expirou, tente fazer login no VR novamente</string>
   <string name="morphe_oauth2_connection_failure_status">OAuth2 está temporariamente indisponível (status %s)</string>
@@ -232,6 +256,20 @@ Para fazer login, pressione continuar abaixo"</string>
   <string name="morphe_replace_music_with_youtube_summary">Substitui music.youtube.com por youtube.com em links compartilhados</string>
   <string name="morphe_replace_links_with_shortener_title">Alterar links de compartilhamento para youtu.be</string>
   <string name="morphe_replace_links_with_shortener_summary">Força os vídeos a usar o formato de URL abreviado youtu.be</string>
+  <!-- video.quality.rememberVideoQualityPatch -->
+  <!-- Translations should match the language used in 'morphe_custom_playback_speeds_auto'. -->
+  <string name="morphe_video_quality_default_entry_1">Automático</string>
+  <string name="morphe_remember_video_quality_last_selected_title">Lembrar qualidade do vídeo</string>
+  <string name="morphe_remember_video_quality_last_selected_summary">Aplica a sua seleção manual de qualidade a todos os vídeos futuros</string>
+  <string name="morphe_remember_video_quality_last_selected_toast_title">Notificações de alteração de qualidade</string>
+  <string name="morphe_remember_video_quality_last_selected_toast_summary">Exibe uma notificação quando uma nova qualidade padrão é salva</string>
+  <string name="morphe_video_quality_default_wifi_title">Qualidade de vídeo padrão na rede Wi-Fi</string>
+  <string name="morphe_video_quality_default_mobile_title">Qualidade de vídeo padrão na rede móvel</string>
+  <string name="morphe_remember_video_quality_toast_mobile">Qualidade padrão móvel alterada para: %s</string>
+  <string name="morphe_remember_video_quality_toast_wifi">Qualidade padrão de Wi-Fi alterada para: %s</string>
+  <!-- misc.sharesheet.openSystemShareSheetPatch -->
+  <string name="morphe_open_system_share_sheet_title">Abrir a folha de compartilhamento do sistema</string>
+  <string name="morphe_open_system_share_sheet_summary">Abre a folha de compartilhamento do sistema em vez da do aplicativo ao compartilhar conteúdo</string>
   <!-- misc.debugging.enableDebuggingPatch -->
   <string name="morphe_debug_litho_title">Registro do Litho</string>
   <string name="morphe_debug_litho_entry_disabled">Desativado</string>

@@ -522,6 +522,10 @@ Egy alkalommal megnyitott, Ask gombbal ellátott videó esetén a funkció minde
   <!-- layout.returnyoutubedislike.returnYouTubeDislikePatch -->
   <string name="morphe_ryd_feed_like_count_title">Kedvelésszám megjelenítése a hírfolyam bélyegképein</string>
   <string name="morphe_ryd_feed_like_ratio_title">Kedvelési arány megjelenítése a hírfolyam bélyegképein</string>
+  <string name="morphe_ryd_feed_counts_position_title">Hírfolyam bélyegkép kedvelés pozíciója</string>
+  <string name="morphe_ryd_feed_counts_position_entry_1">A megtekintések száma mellett</string>
+  <string name="morphe_ryd_feed_counts_position_entry_2">Középen rechtsra</string>
+  <string name="morphe_ryd_feed_counts_position_entry_3">Balra fent</string>
   <!-- interaction.searchcomments.searchCommentsPatch -->
   <string name="morphe_search_comments_title">Hozzászólások keresése</string>
   <string name="morphe_search_comments_summary">Koppintson a kereső gombra a kommentekben, hogy csak a betöltött kommentek közül azok jelenjenek meg, amelyek tartalmazzák az összes keresett szót. A kifejezések kereséséhez tegye a szavakat idézőjelbe</string>
@@ -695,6 +699,9 @@ Figyelem: Lehet, hogy az élő közvetítéseknél nem működik"</string>
   <string name="morphe_play_all_button_type_entry_11">Csak tag Shortok</string>
   <string name="morphe_play_all_button_type_entry_12">Csak tag élő streamjei</string>
   <string name="morphe_play_all_button_not_available_toast">A lejátszási listát nem sikerült létrehozni a csatornaazonosító egyeztetési hibája miatt</string>
+  <!-- interaction.playlistpanel.playlistPanelButtonPatch -->
+  <string name="morphe_playlist_panel_button_title">Lejátszási lista megjelenítése gomb</string>
+  <string name="morphe_playlist_panel_button_summary">Koppintson a lejátszási lista paneljének megnyitásához. Csak lejátszási lista lejátszása esetén jelenik meg</string>
   <!-- interaction.reload.reloadVideoPatch -->
   <string name="morphe_reload_video_button_title">Videó újratöltés gomb megjelenítése</string>
   <string name="morphe_dismiss_player_not_available_toast">A videóazonosító nem érhető el. Kérjük, töltse újra a videót manuálisan</string>
@@ -1034,6 +1041,8 @@ A Beállítások eléréséhez aktiválja a Beállítások gombot az Általános
   <string name="morphe_navigation_bar_glass_summary">A navigációs sáv egy lebegő, lekerekített, áttetsző kapszulaként jelenik meg. Nem érhető el az átlátszatlan navigációs sáv stílussal</string>
   <string name="morphe_navigation_bar_glass_opacity_title">Üveg átlátszósága</string>
   <string name="morphe_navigation_bar_glass_opacity_summary">Állítsa be az üveg navigációs sáv átlátszósági szintjét (0 átlátszó, 100 átlátszatlan)</string>
+  <string name="morphe_navigation_bar_glass_round_title">Kerek üveg navigációs sáv</string>
+  <string name="morphe_navigation_bar_glass_round_summary">Kerek végeket ad az üveg navigációs sávnak a miniplayer üveg sarkai helyett</string>
   <string name="morphe_navigation_bar_glass_size_title">Üveg navigációs sáv mérete</string>
   <string name="morphe_navigation_bar_glass_size_summary">Állítsa be az üveg navigációs sáv magasságát, szélességét és a gombok közötti távolságot, előnézettel. A képernyő szélességébe nem férő gombok el lesznek rejtve</string>
   <string name="morphe_navigation_bar_glass_size_height">Magasság</string>
@@ -1204,9 +1213,24 @@ Beállítások → Lejátszás (vagy Automatikus lejátszás) → Következő vi
   <!-- layout.panels.popup.disablePlayerPopupPanelsPatch -->
   <string name="morphe_disable_player_popup_panels_title">Lejátszó előugró panelek letiltása</string>
   <string name="morphe_disable_player_popup_panels_summary">Letiltja a felugró panelek automatikus megnyílását (lejátszási lista, élő csevegőpanel)</string>
+  <!-- layout.player.playlistpanel.fullscreenPlaylistPanelPatch -->
+  <string name="morphe_fullscreen_playlist_panel_title">Lejátszási lista panel megjelenítése teljes képernyőben</string>
+  <string name="morphe_fullscreen_playlist_panel_summary_on">A lejátszási lista panel a teljes képernyős lejátszó felett nyílik meg</string>
+  <string name="morphe_fullscreen_playlist_panel_summary_off">A lejátszási lista panel kilép teljes képernyőjű módból táblagépeken</string>
   <!-- layout.playlistautoplay.disablePlaylistAutoplayPatch -->
   <string name="morphe_disable_playlist_autoplay_title">Lejátszási lista automatikus lejátszásának kikapcsolása</string>
   <string name="morphe_disable_playlist_autoplay_summary">Megakadályozza, hogy a lejátszási listák automatikusan továbblépjenek a következő videóra</string>
+  <!-- interaction.autoplay.autoplayControlPatch -->
+  <string name="morphe_autoplay_control_title">Automatikus lejátszás vezérlése</string>
+  <string name="morphe_autoplay_control_summary">Hozzáad egy lejátszó gombot és egy szabályt a következő videóra. A lejátszási listák és sorok továbbfutnak, a Mix egy bizonyos számú videó után megáll, a javasolt videók soha nem futnak le. Koppints a gombra a következő mód váltásához, és tartsd nyomva a lista megjelenítéséhez</string>
+  <string name="morphe_autoplay_mode_title">Automatikus lejátszási mód</string>
+  <string name="morphe_autoplay_mode_entry_1">Automatikus</string>
+  <string name="morphe_autoplay_mode_entry_2">Egyetlen</string>
+  <string name="morphe_autoplay_mode_entry_3">Ki</string>
+  <string name="morphe_autoplay_mix_stop_after_title">Mix hossza</string>
+  <string name="morphe_autoplay_mix_stop_after_summary">Az Automatikus módban a Mix ennyi videó után megáll. 0 = nincs korlát</string>
+  <string name="morphe_autoplay_mix_length">Mix: %s videó</string>
+  <string name="morphe_autoplay_mix_no_limit">Keverés: korlátlan</string>
   <!-- interaction.continuewatching.disableContinueWatchingPromptPatch -->
   <string name="morphe_continue_watching_prompt_title">\"Folytassa a megtekintést?\" felugró ablak</string>
   <string name="morphe_continue_watching_prompt_entry_1">Alapértelmezett</string>
@@ -1282,9 +1306,6 @@ Autós elrendezés
   <string name="morphe_spoof_app_version_target_entry_20_39">20.39.41 - Régi mentés visszaállítása a lejátszási listába</string>
   <string name="morphe_spoof_app_version_target_entry_20_28">20.28.41 - Félkövér ikonok letiltása</string>
   <string name="morphe_spoof_app_version_target_entry_20_13">20.13.41 - Csatornanév visszaállítása a videólejátszó alá</string>
-  <!-- misc.sharesheet.openSystemShareSheetPatch -->
-  <string name="morphe_open_system_share_sheet_title">Nyissa meg a rendszerosztásos menüt</string>
-  <string name="morphe_open_system_share_sheet_summary">Megnyitja a rendszer megosztási lapját ahelyett, hogy az alkalmazáson belüli lapot nyitná meg a tartalom megosztásakor</string>
   <!-- layout.music.overrideYouTubeMusicButtonsPatch -->
   <string name="morphe_override_youtube_music_buttons_title">A YouTube Music gombok felülbírálása</string>
   <string name="morphe_override_youtube_music_buttons_summary">A kívánt zenealkalmazást nyitja meg az alapértelmezett YouTube Music alkalmazás helyett</string>
@@ -1362,6 +1383,8 @@ Autós elrendezés
   <string name="morphe_miniplayer_swipe_up_expand_summary">A minimalizált lejátszó felfelé húzása kibontja a lejátszót, nem pedig a képernyő tetejére mozgatja</string>
   <string name="morphe_miniplayer_docked_title">Dokkolt minimizált lejátszó</string>
   <string name="morphe_miniplayer_docked_summary">Rögzíti a minimalizált lejátszót a navigációs sávhoz és a képernyő széleihez, ahelyett hogy felette lebegne</string>
+  <string name="morphe_miniplayer_glass_title">Üveg miniplayer</string>
+  <string name="morphe_miniplayer_glass_summary">Átlátszó üvegként, lekerekített sarkokkal jeleníti meg a miniplayert, hasonlóan az üveg navigációs sávhoz. Ehhez szükség van az üveg navigációs sávra</string>
   <string name="morphe_miniplayer_type_entry_0">Kikapcsolva</string>
   <string name="morphe_miniplayer_type_entry_1">Alapértelmezett</string>
   <string name="morphe_miniplayer_type_entry_2">Minimális</string>
@@ -1478,7 +1501,6 @@ A videókat a hash-elt videóazonosító rövid előtagjával kérik le, így a 
   <!-- Translations of this should not be longer than the original English text, otherwise the text can be clipped and not entirely shown. -->
   <string name="morphe_dearrow_error">A DeArrow átmenetileg nem érhető el (állapotkód: %s)</string>
   <string name="morphe_dearrow_error_generic">A DeArrow átmenetileg nem érhető el</string>
-  <!-- misc.announcements.announcementsPatch -->
   <!-- misc.playercontrols.playerControlsPatch -->
   <string name="morphe_restore_old_player_buttons_title">Régi lejátszó gomb stílusának visszaállítása</string>
   <string name="morphe_restore_old_player_buttons_summary">A videólejátszó vezérlőgombok régi, keskenyebb stílusához való visszatérés</string>
@@ -1518,25 +1540,20 @@ A videókat a hash-elt videóazonosító rövid előtagjával kérik le, így a 
   <string name="morphe_video_delay_button_flyout_title">Videó késleltetés menü megjelenítése</string>
   <string name="morphe_video_delay_dialog_input_hint">Késleltetés ezredmásodpercben</string>
   <!-- video.quality.rememberVideoQualityPatch -->
-  <!-- Translations should match the language used in 'morphe_custom_playback_speeds_auto'. -->
-  <string name="morphe_video_quality_default_entry_1">Automatikus</string>
-  <string name="morphe_remember_video_quality_last_selected_title">A videóminőség megjegyzése</string>
-  <string name="morphe_remember_video_quality_last_selected_summary">Az egyéni minőségválasztás alkalmazása minden jövőbeli videóra</string>
-  <string name="morphe_remember_video_quality_last_selected_toast_title">Minőségváltás értesítései</string>
-  <string name="morphe_remember_video_quality_last_selected_toast_summary">Értesítést jelenít meg, amikor egy új alapértelmezett minőség kerül mentésre</string>
-  <string name="morphe_video_quality_default_wifi_title">Alapértelmezett videó minőség Wi-Fi hálózaton</string>
-  <string name="morphe_video_quality_default_mobile_title">Alapértelmezett videó minőség mobilhálózaton</string>
   <string name="morphe_remember_shorts_quality_last_selected_title">A Shorts minőség megjegyzése</string>
   <string name="morphe_remember_shorts_quality_last_selected_summary">Az egyéni minőségválasztás alkalmazása minden jövőbeli Shortsra</string>
   <string name="morphe_shorts_quality_default_wifi_title">Alapértelmezett Shorts minőség Wi-Fi hálózaton</string>
   <string name="morphe_shorts_quality_default_mobile_title">Alapértelmezett Shorts minőség mobilhálózaton</string>
-  <string name="morphe_remember_video_quality_toast_mobile">Az alapértelmezett mobilminőséget %s-re módosítva</string>
-  <string name="morphe_remember_video_quality_toast_wifi">Az alapértelmezett Wi-Fi minőséget %s-re módosítva</string>
   <string name="morphe_remember_video_quality_toast_shorts_mobile">A Shorts mobilminősége %s-re módosítva</string>
   <string name="morphe_remember_video_quality_toast_shorts_wifi">A Shorts Wi-Fi minősége %s-re módosítva</string>
   <!-- video.speed.button.playbackSpeedButtonPatch -->
   <string name="morphe_playback_speed_dialog_button_title">Lejátszási sebesség gomb megjelenítése</string>
   <string name="morphe_playback_speed_dialog_button_summary">Érintse meg és tartsa lenyomva a sebesség alaphelyzetbe állításához</string>
+  <string name="morphe_playback_speed_button_cycle_title">Koppints a Lejátszási sebesség gombra a sebességek váltogatásához</string>
+  <string name="morphe_playback_speed_button_cycle_summary">Egy koppintás átugorál a lista következő sebességére. Az érintés és tartás megnyitja a sebességmenüt</string>
+  <string name="morphe_playback_speed_button_cycle_speeds_title">Lejátszási sebesség gomb sebességei</string>
+  <string name="morphe_playback_speed_button_cycle_speeds_summary">Azok a sebességek, amelyeken a koppintás váltogat, soronként egy. Az utolsó sebesség után egy koppintás visszaviszi az elsőhöz</string>
+  <string name="morphe_playback_speed_button_cycle_speeds_invalid">Érvénytelen sebességváltási lista, visszaállítás az alapértelmezettre</string>
   <!-- video.quality.button.videoQualityDialogButtonPatch -->
   <string name="morphe_video_quality_dialog_button_title">Minőség gomb megjelenítése</string>
   <string name="morphe_video_quality_dialog_button_summary">Érintse meg és tartsa lenyomva a minőség alaphelyzetbe állításához</string>
@@ -1804,6 +1821,8 @@ Az automatikus rögzítés opcionális. Inkognitó módban vagy a fiókváltás 
   <string name="morphe_niconico_comments_screen_title">Niconico kommentek</string>
   <string name="morphe_niconico_comments_screen_summary">Mutassa a élő chatet és a chat lejátszást olyan kommentekként, amelyek végiggurulnak a videón</string>
   <string name="morphe_niconico_comments_summary">Egy átfedő gombot jelenít meg a videolejátszóban. Koppintson a kommentek megjelenítéséhez vagy elrejtéséhez, és tartsa nyomva a gyorsbeállításokhoz</string>
+  <string name="morphe_niconico_comments_pip_title">Megjelenítése kép a képben módban</string>
+  <string name="morphe_niconico_comments_pip_summary">A kommentek mérete lekicsinyedik, hogy megfeleljenek az ablaknak</string>
   <string name="morphe_niconico_comments_appearance_title">Megjelenés</string>
   <string name="morphe_niconico_comments_portrait_category_title">Portré</string>
   <string name="morphe_niconico_comments_video_types_title">Videótípusok</string>

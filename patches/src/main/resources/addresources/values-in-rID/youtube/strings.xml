@@ -522,6 +522,10 @@ Setelah video dengan tombol Tanya dibuka satu kali, fitur ini berfungsi untuk se
   <!-- layout.returnyoutubedislike.returnYouTubeDislikePatch -->
   <string name="morphe_ryd_feed_like_count_title">Tampilkan jumlah suka pada thumbnail feed</string>
   <string name="morphe_ryd_feed_like_ratio_title">Tampilkan persentase suka pada thumbnail feed</string>
+  <string name="morphe_ryd_feed_counts_position_title">Posisi suka thumbnail feed</string>
+  <string name="morphe_ryd_feed_counts_position_entry_1">Di samping jumlah penayangan</string>
+  <string name="morphe_ryd_feed_counts_position_entry_2">Tengah kanan</string>
+  <string name="morphe_ryd_feed_counts_position_entry_3">Kiri atas</string>
   <!-- interaction.searchcomments.searchCommentsPatch -->
   <string name="morphe_search_comments_title">Cari komentar</string>
   <string name="morphe_search_comments_summary">Ketuk tombol cari di komentar untuk menampilkan hanya komentar yang dimuat yang mengandung semua kata yang dicari. Gunakan tanda kutip pada kata untuk mencari frasa</string>
@@ -696,6 +700,9 @@ Info: Mungkin tidak berfungsi pada siaran langsung"</string>
   <string name="morphe_play_all_button_type_entry_11">Shorts hanya untuk Pelanggan</string>
   <string name="morphe_play_all_button_type_entry_12">Siaran langsung hanya untuk Pelanggan</string>
   <string name="morphe_play_all_button_not_available_toast">Tidak dapat membuat daftar putar karena ID saluran tidak cocok</string>
+  <!-- interaction.playlistpanel.playlistPanelButtonPatch -->
+  <string name="morphe_playlist_panel_button_title">Tampilkan tombol Daftar Putar</string>
+  <string name="morphe_playlist_panel_button_summary">Ketuk untuk membuka panel daftar putar. Hanya ditampilkan saat memutar daftar putar</string>
   <!-- interaction.reload.reloadVideoPatch -->
   <string name="morphe_reload_video_button_title">Tampilkan tombol Muat ulang video</string>
   <string name="morphe_dismiss_player_not_available_toast">ID video tidak tersedia. Silakan muat ulang video secara manual</string>
@@ -1035,6 +1042,8 @@ Untuk mengakses Setelan, aktifkan tombol Setelan melalui Umum → Bilah Alat →
   <string name="morphe_navigation_bar_glass_summary">Menampilkan bilah navigasi sebagai kapsul transparan, bulat, dan mengambang. Tidak tersedia dengan gaya bilah navigasi Buram</string>
   <string name="morphe_navigation_bar_glass_opacity_title">Opasitas kaca</string>
   <string name="morphe_navigation_bar_glass_opacity_summary">Sesuaikan level transparansi bilah navigasi kaca (0 adalah transparan, 100 adalah solid)</string>
+  <string name="morphe_navigation_bar_glass_round_title">Bilah navigasi kaca bulat</string>
+  <string name="morphe_navigation_bar_glass_round_summary">Memberikan ujung bulat pada bilah navigasi kaca, bukan sudut seperti miniplayer kaca</string>
   <string name="morphe_navigation_bar_glass_size_title">Ukuran bilah navigasi kaca</string>
   <string name="morphe_navigation_bar_glass_size_summary">Sesuaikan tinggi, lebar, dan jarak tombol bilah navigasi kaca, lengkap dengan pratinjau. Tombol yang tidak muat dalam lebar layar akan disembunyikan</string>
   <string name="morphe_navigation_bar_glass_size_height">Tinggi</string>
@@ -1205,9 +1214,24 @@ Setelan → Pemutaran (atau Pemutaran Otomatis) → Putar video berikutnya secar
   <!-- layout.panels.popup.disablePlayerPopupPanelsPatch -->
   <string name="morphe_disable_player_popup_panels_title">Nonaktifkan panel pesan timbul pemutar</string>
   <string name="morphe_disable_player_popup_panels_summary">Menonaktifkan panel daftar putar dan live chat agar tidak terbuka secara otomatis</string>
+  <!-- layout.player.playlistpanel.fullscreenPlaylistPanelPatch -->
+  <string name="morphe_fullscreen_playlist_panel_title">Tampilkan panel daftar putar dalam layar penuh</string>
+  <string name="morphe_fullscreen_playlist_panel_summary_on">Panel daftar putar terbuka di atas pemutar layar penuh</string>
+  <string name="morphe_fullscreen_playlist_panel_summary_off">Panel daftar putar keluar dari layar penuh pada tablet</string>
   <!-- layout.playlistautoplay.disablePlaylistAutoplayPatch -->
   <string name="morphe_disable_playlist_autoplay_title">Nonaktifkan pemutaran otomatis daftar putar</string>
   <string name="morphe_disable_playlist_autoplay_summary">Mencegah daftar putar beralih secara otomatis ke video berikutnya</string>
+  <!-- interaction.autoplay.autoplayControlPatch -->
+  <string name="morphe_autoplay_control_title">Kontrol putar otomatis</string>
+  <string name="morphe_autoplay_control_summary">Menambahkan tombol pemutar dan aturan untuk video berikutnya. Daftar putar dan antrean tetap berjalan, Mix berhenti setelah sejumlah video, video yang disarankan tidak pernah diputar. Ketuk tombol untuk mode berikutnya, tekan dan tahan untuk melihat daftar</string>
+  <string name="morphe_autoplay_mode_title">Mode putar otomatis</string>
+  <string name="morphe_autoplay_mode_entry_1">Otomatis</string>
+  <string name="morphe_autoplay_mode_entry_2">Tunggal</string>
+  <string name="morphe_autoplay_mode_entry_3">Nonaktif</string>
+  <string name="morphe_autoplay_mix_stop_after_title">Panjang Mix</string>
+  <string name="morphe_autoplay_mix_stop_after_summary">Dalam mode Otomatis, Mix berhenti setelah jumlah video sebanyak ini. 0 = tidak ada batas</string>
+  <string name="morphe_autoplay_mix_length">Mix: %s video</string>
+  <string name="morphe_autoplay_mix_no_limit">Mix: tidak ada batas</string>
   <!-- interaction.continuewatching.disableContinueWatchingPromptPatch -->
   <string name="morphe_continue_watching_prompt_title">Prompt \"Lanjutkan menonton\"</string>
   <string name="morphe_continue_watching_prompt_entry_1">Bawaan</string>
@@ -1282,9 +1306,6 @@ Tata letak Otomotif
   <string name="morphe_spoof_app_version_target_entry_20_39">20.39.41 - Kembalikan penyimpanan lama ke daftar putar</string>
   <string name="morphe_spoof_app_version_target_entry_20_28">20.28.41 - Nonaktifkan ikon tebal</string>
   <string name="morphe_spoof_app_version_target_entry_20_13">20.13.41 - Kembalikan nama saluran di bawah pemutar video</string>
-  <!-- misc.sharesheet.openSystemShareSheetPatch -->
-  <string name="morphe_open_system_share_sheet_title">Buka lembar berbagi sistem</string>
-  <string name="morphe_open_system_share_sheet_summary">Membuka lembar berbagi sistem, bukan yang dalam aplikasi saat membagikan konten</string>
   <!-- layout.music.overrideYouTubeMusicButtonsPatch -->
   <string name="morphe_override_youtube_music_buttons_title">Ganti tombol YouTube Music</string>
   <string name="morphe_override_youtube_music_buttons_summary">Membuka aplikasi musik pilihan Anda daripada aplikasi bawaan YouTube Music</string>
@@ -1362,6 +1383,8 @@ Tata letak Otomotif
   <string name="morphe_miniplayer_swipe_up_expand_summary">Mengusap miniplayer ke atas akan memperluas pemutar, alih-alih memindahkan miniplayer ke bagian atas layar</string>
   <string name="morphe_miniplayer_docked_title">Miniplayer tertambat</string>
   <string name="morphe_miniplayer_docked_summary">Menempelkan miniplayer ke bilah navigasi dan sisi layar, alih-alih mengapung di atasnya</string>
+  <string name="morphe_miniplayer_glass_title">Miniplayer kaca</string>
+  <string name="morphe_miniplayer_glass_summary">Menampilkan miniplayer sebagai kaca transparan dengan sudut bulat, seperti bilah navigasi kaca. Memerlukan bilah navigasi kaca</string>
   <string name="morphe_miniplayer_type_entry_0">Dinonaktifkan</string>
   <string name="morphe_miniplayer_type_entry_1">Bawaan</string>
   <string name="morphe_miniplayer_type_entry_2">Minimal</string>
@@ -1478,7 +1501,6 @@ Video diminta dengan awalan pendek dari ID video yang di-hash, sehingga server t
   <!-- Translations of this should not be longer than the original English text, otherwise the text can be clipped and not entirely shown. -->
   <string name="morphe_dearrow_error">DeArrow sementara tidak tersedia (kode status: %s)</string>
   <string name="morphe_dearrow_error_generic">DeArrow sementara tidak tersedia</string>
-  <!-- misc.announcements.announcementsPatch -->
   <!-- misc.playercontrols.playerControlsPatch -->
   <string name="morphe_restore_old_player_buttons_title">Kembalikan gaya tombol pemutar lama</string>
   <string name="morphe_restore_old_player_buttons_summary">Mengembalikan tampilan tombol pemutar video yang tebal ke gaya visual yang lebih lama, lebih ramping</string>
@@ -1518,25 +1540,20 @@ Video diminta dengan awalan pendek dari ID video yang di-hash, sehingga server t
   <string name="morphe_video_delay_button_flyout_title">Tampilkan menu penundaan video</string>
   <string name="morphe_video_delay_dialog_input_hint">Penundaan dalam milidetik</string>
   <!-- video.quality.rememberVideoQualityPatch -->
-  <!-- Translations should match the language used in 'morphe_custom_playback_speeds_auto'. -->
-  <string name="morphe_video_quality_default_entry_1">Otomatis</string>
-  <string name="morphe_remember_video_quality_last_selected_title">Ingat kualitas video</string>
-  <string name="morphe_remember_video_quality_last_selected_summary">Menerapkan pilihan kualitas manual Anda ke semua video mendatang</string>
-  <string name="morphe_remember_video_quality_last_selected_toast_title">Notifikasi perubahan kualitas</string>
-  <string name="morphe_remember_video_quality_last_selected_toast_summary">Menampilkan notifikasi saat kualitas video bawaan baru disimpan</string>
-  <string name="morphe_video_quality_default_wifi_title">Kualitas video bawaan di jaringan Wi-Fi</string>
-  <string name="morphe_video_quality_default_mobile_title">Kualitas video bawaan di jaringan selular</string>
   <string name="morphe_remember_shorts_quality_last_selected_title">Ingat kualitas Shorts</string>
   <string name="morphe_remember_shorts_quality_last_selected_summary">Menerapkan pilihan kualitas manual Anda ke semua Shorts mendatang</string>
   <string name="morphe_shorts_quality_default_wifi_title">Kualitas Shorts bawaan di jaringan Wi-Fi</string>
   <string name="morphe_shorts_quality_default_mobile_title">Kualitas Shorts bawaan di jaringan seluler</string>
-  <string name="morphe_remember_video_quality_toast_mobile">Kualitas seluler bawaan diubah menjadi: %s</string>
-  <string name="morphe_remember_video_quality_toast_wifi">Kualitas Wi-Fi bawaan diubah menjadi: %s</string>
   <string name="morphe_remember_video_quality_toast_shorts_mobile">Kualitas Shorts seluler diubah menjadi: %s</string>
   <string name="morphe_remember_video_quality_toast_shorts_wifi">Kualitas Shorts Wi-Fi diubah menjadi: %s</string>
   <!-- video.speed.button.playbackSpeedButtonPatch -->
   <string name="morphe_playback_speed_dialog_button_title">Tampilkan tombol kecepatan Pemutaran</string>
   <string name="morphe_playback_speed_dialog_button_summary">Ketuk dan tahan untuk mereset kecepatan ke bawaan</string>
+  <string name="morphe_playback_speed_button_cycle_title">Ketuk tombol Kecepatan pemutaran untuk menggilir kecepatan</string>
+  <string name="morphe_playback_speed_button_cycle_summary">Ketukan akan berpindah ke kecepatan berikutnya dalam daftar. Ketuk dan tahan untuk membuka menu kecepatan</string>
+  <string name="morphe_playback_speed_button_cycle_speeds_title">Kecepatan tombol kecepatan pemutaran</string>
+  <string name="morphe_playback_speed_button_cycle_speeds_summary">Kecepatan yang digilir melalui ketukan, satu per baris. Setelah kecepatan terakhir, ketukan akan kembali ke yang pertama</string>
+  <string name="morphe_playback_speed_button_cycle_speeds_invalid">Daftar siklus kecepatan tidak valid, reset ke default</string>
   <!-- video.quality.button.videoQualityDialogButtonPatch -->
   <string name="morphe_video_quality_dialog_button_title">Tampilkan tombol Kualitas</string>
   <string name="morphe_video_quality_dialog_button_summary">Ketuk dan tahan untuk mereset kualitas ke bawaan</string>
@@ -1804,6 +1821,8 @@ Pencatatan otomatis bersifat opsional. Pencatatan berhenti dalam mode penyamaran
   <string name="morphe_niconico_comments_screen_title">Komentar Niconico</string>
   <string name="morphe_niconico_comments_screen_summary">Tampilkan live chat dan putar ulang chat sebagai komentar yang bergulir di sepanjang video</string>
   <string name="morphe_niconico_comments_summary">Menampilkan tombol hamparan di pemutar video. Ketuk untuk menampilkan atau menyembunyikan komentar, ketuk dan tahan untuk setelan cepat</string>
+  <string name="morphe_niconico_comments_pip_title">Tampilkan dalam gambar-dalam-gambar</string>
+  <string name="morphe_niconico_comments_pip_summary">Komentar diperkecil agar pas dengan jendela</string>
   <string name="morphe_niconico_comments_appearance_title">Tampilan</string>
   <string name="morphe_niconico_comments_portrait_category_title">Potret</string>
   <string name="morphe_niconico_comments_video_types_title">Tipe video</string>
