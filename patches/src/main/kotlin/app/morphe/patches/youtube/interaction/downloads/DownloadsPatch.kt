@@ -26,13 +26,17 @@ import app.morphe.patcher.util.getReference
 import app.morphe.patcher.util.numberOfParameterRegistersLogical
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.morphe.patcher.util.registersUsed
-import app.morphe.patches.shared.FormatStreamModelToStringFingerprint
+import app.morphe.patches.shared.misc.downloads.EXTENSION_FORMAT_STREAM_INTERFACE
+import app.morphe.patches.shared.misc.downloads.EXTENSION_STREAMING_DATA_INTERFACE
+import app.morphe.patches.shared.misc.downloads.OfflineSettingsConstructorFingerprint
 import app.morphe.patches.shared.misc.downloads.exportDownloadFolderPreference
+import app.morphe.patches.shared.misc.downloads.hookDownloadQualities
 import app.morphe.patches.shared.misc.fix.proto.fixProtoLibraryPatch
 import app.morphe.patches.shared.misc.fix.proto.parseByteArrayWithRegistryMethodRef
 import app.morphe.patches.shared.misc.fix.proto.protoDefaultInstanceFingerprint
 import app.morphe.patches.shared.misc.proto.hookElement
 import app.morphe.patches.shared.misc.settings.preference.ListPreference
+import app.morphe.patches.shared.misc.settings.preference.NonInteractivePreference
 import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference
 import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference.Sorting
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
@@ -48,8 +52,8 @@ import app.morphe.patches.youtube.misc.playservice.versionCheckPatch
 import app.morphe.patches.youtube.misc.proto.elementProtoParserHookPatch
 import app.morphe.patches.youtube.misc.settings.PreferenceScreen
 import app.morphe.patches.youtube.misc.settings.settingsPatch
+import app.morphe.patches.youtube.misc.spoof.dimensions.spoofDeviceDimensionsPatch
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
-import app.morphe.patches.youtube.video.format.videoFormatPatch
 import app.morphe.patches.youtube.video.information.videoInformationPatch
 import app.morphe.util.ResourceGroup
 import app.morphe.util.addInstructionsAtControlFlowLabel
@@ -66,7 +70,9 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 private val downloadsResourcePatch = patch {
     dependsOn(
         legacyPlayerControlsPatch,
-        settingsPatch
+        settingsPatch,
+        // The download settings note points to its setting.
+        spoofDeviceDimensionsPatch
     )
 
     execute {
@@ -79,6 +85,10 @@ private val downloadsResourcePatch = patch {
                     SwitchPreference("morphe_shorts_download_flyout_button", summary = true),
                     SwitchPreference("morphe_feed_download_flyout_button", summary = true),
                     SwitchPreference("morphe_download_force_4k", summary = true),
+                    NonInteractivePreference(
+                        "morphe_download_quality_about",
+                        tag = "app.morphe.extension.youtube.settings.preference.DownloadQualityAboutPreference"
+                    ),
                     exportDownloadFolderPreference(),
                     SwitchPreference("morphe_external_downloader_overlay_button", summary = true),
                     TextPreference(
@@ -117,13 +127,7 @@ private const val EXTENSION_CLASS = "Lapp/morphe/extension/youtube/patches/Downl
 internal const val EXTENSION_IN_APP_DOWNLOADS_CLASS = "Lapp/morphe/extension/youtube/patches/InAppDownloadsPatch;"
 
 private const val EXTENSION_STREAM_SELECTOR_INTERFACE =
-    "Lapp/morphe/extension/youtube/patches/InAppDownloadsPatch\$DownloadStreamSelector;"
-
-private const val EXTENSION_STREAMING_DATA_INTERFACE =
-    "Lapp/morphe/extension/youtube/patches/InAppDownloadsPatch\$StreamingDataInterface;"
-
-private const val EXTENSION_FORMAT_STREAM_INTERFACE =
-    "Lapp/morphe/extension/youtube/patches/InAppDownloadsPatch\$FormatStreamInterface;"
+    $$"Lapp/morphe/extension/youtube/patches/InAppDownloadsPatch$DownloadStreamSelector;"
 
 private const val EXTENSION_SPOOF_CLASS = "Lapp/morphe/extension/shared/spoof/SpoofVideoStreamsPatch;"
 
@@ -154,7 +158,6 @@ val downloadsPatch = patch(
         downloadsResourcePatch,
         authHookPatch,
         videoInformationPatch,
-        videoFormatPatch,
         legacyPlayerControlsPatch,
         fixProtoLibraryPatch,
         elementProtoParserHookPatch,
@@ -440,15 +443,9 @@ val downloadsPatch = patch(
 
         // Offer up to 2160p on every screen. The app offers only the qualities up to the
         // shorter side of the screen, and the server offers up to 1080p.
+        hookDownloadQualities()
         val copyImmutableListMethod = OfflineSettingsConstructorFingerprint
-            .instructionMatches.first().methodReference!!
-        OfflineSettingsConstructorFingerprint.method.addInstructions(
-            0,
-            """
-                invoke-static { p3 }, $EXTENSION_IN_APP_DOWNLOADS_CLASS->getMaxDownloadQualityHeight(I)I
-                move-result p3
-            """
-        )
+            .instructionMatches.last().methodReference
 
         // The download quality setting lists the same qualities as the quality picker.
         OfflineSettingCategoryConstructorFingerprint.method.addInstructions(
@@ -467,19 +464,6 @@ val downloadsPatch = patch(
                 move-result-object p5
                 invoke-static { p5 }, $copyImmutableListMethod
                 move-result-object p5
-            """
-        )
-
-        // Labels of the qualities above 1080p in the download quality setting.
-        FormatTypeLabelFingerprint.method.addInstructionsWithLabels(
-            0,
-            """
-                invoke-static { p0 }, $EXTENSION_IN_APP_DOWNLOADS_CLASS->getDownloadQualityLabel(Ljava/lang/Object;)I
-                move-result v0
-                if-eqz v0, :app_label
-                return v0
-                :app_label
-                nop
             """
         )
 
@@ -512,20 +496,8 @@ val downloadsPatch = patch(
 
         // Log the download qualities that are dropped or not available, and optionally save 1440p
         // and 2160p even if the device or server checks of the app rule out their streams.
-        StreamingDataFormatStreamsFingerprint.let {
-            it.classDef.addPatchInterface(
-                EXTENSION_STREAMING_DATA_INTERFACE,
-                "patch_getFormatStreams",
-                it.instructionMatches.first().fieldReference!!
-            )
-        }
-        FormatStreamModelToStringFingerprint.let {
-            it.classDef.addPatchInterface(
-                EXTENSION_FORMAT_STREAM_INTERFACE,
-                "patch_getFormat",
-                it.instructionMatches[5].fieldReference!!
-            )
-        }
+        // The audio stream of a download is matched to the container of the video stream,
+        // so the download can be exported as one file.
         DownloadStreamSelectorFingerprint.let {
             it.classDef.apply {
                 val originalSelectorMethod = it.method.cloneMutable(name = "patch_originalSelectStream")
@@ -546,7 +518,7 @@ val downloadsPatch = patch(
             it.method.addInstructions(
                 0,
                 """
-                    invoke-static/range { p0 .. p6 }, $EXTENSION_IN_APP_DOWNLOADS_CLASS->selectDownloadStream(Ljava/lang/Object;IIILjava/lang/Object;ZLjava/lang/Object;)Ljava/lang/Object;
+                    invoke-static/range { p0 .. p6 }, $EXTENSION_IN_APP_DOWNLOADS_CLASS->selectDownloadStream(${EXTENSION_STREAM_SELECTOR_INTERFACE}III${EXTENSION_STREAMING_DATA_INTERFACE}ZLjava/lang/Object;)${EXTENSION_FORMAT_STREAM_INTERFACE}
                     move-result-object v0
                     check-cast v0, ${it.method.returnType}
                     return-object v0
@@ -559,7 +531,8 @@ val downloadsPatch = patch(
                 val pairIndex = it.instructionMatches[1].index + numberOfParameterRegistersLogical
                 val pairInstruction = getInstruction(pairIndex)
                 val videoStreamRegister = pairInstruction.registersUsed[1]
-                val videoStreamType = pairInstruction.getReference<MethodReference>()!!.parameterTypes.first()
+                val audioStreamRegister = pairInstruction.registersUsed[2]
+                val streamType = pairInstruction.getReference<MethodReference>()!!.parameterTypes.first()
 
                 // p3 and p4 are the audio track and the video ID, which are not needed.
                 addInstructions(
@@ -567,9 +540,15 @@ val downloadsPatch = patch(
                     """
                         move-object/from16 p3, v$videoStreamRegister
                         move/from16 p4, p1
-                        invoke-static/range { p3 .. p5 }, $EXTENSION_IN_APP_DOWNLOADS_CLASS->selectDownloadVideoStream(Ljava/lang/Object;ILjava/lang/Object;)Ljava/lang/Object;
+                        invoke-static/range { p3 .. p5 }, $EXTENSION_IN_APP_DOWNLOADS_CLASS->selectDownloadVideoStream(${EXTENSION_FORMAT_STREAM_INTERFACE}I${EXTENSION_STREAMING_DATA_INTERFACE})${EXTENSION_FORMAT_STREAM_INTERFACE}
                         move-result-object v$videoStreamRegister
-                        check-cast v$videoStreamRegister, $videoStreamType
+                        check-cast v$videoStreamRegister, $streamType
+
+                        move-object/from16 p3, v$audioStreamRegister
+                        move-object/from16 p4, v$videoStreamRegister
+                        invoke-static/range { p3 .. p5 }, $EXTENSION_IN_APP_DOWNLOADS_CLASS->selectDownloadAudioStream(${EXTENSION_FORMAT_STREAM_INTERFACE}${EXTENSION_FORMAT_STREAM_INTERFACE}${EXTENSION_STREAMING_DATA_INTERFACE})${EXTENSION_FORMAT_STREAM_INTERFACE}
+                        move-result-object v$audioStreamRegister
+                        check-cast v$audioStreamRegister, $streamType
                     """
                 )
             }

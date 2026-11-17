@@ -1146,8 +1146,7 @@ public final class FlyoutUtils {
         currentButtonIndex++;
 
         visibleFlyoutButtons.add(new Pair<>(currentButtonName, currentButtonIndex));
-        //noinspection SizeReplaceableByIsEmpty
-        if (buttonText.length() > 0) {
+        if (Utils.isNotEmpty(buttonText)) {
             visibleFlyoutButtonTexts.putIfAbsent(currentButtonName, buttonText.toString());
         }
     }
