@@ -316,15 +316,52 @@ index 00000000..15923d09
 +        return first == null || first.optBoolean("isProcessed", true);
 +    }
 +}
-diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckPatch.java
+diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckInfoPreference.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckInfoPreference.java
 new file mode 100644
-index 00000000..cc871581
+index 00000000..5fcbde14
 --- /dev/null
-+++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckPatch.java
-@@ -0,0 +1,830 @@
++++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckInfoPreference.java
+@@ -0,0 +1,27 @@
 +package app.morphe.extension.youtube.patches;
 +
++import android.content.Context;
++import android.preference.Preference;
++import android.util.AttributeSet;
++
++/** GigiMorphs: explanation at the top of the Fact check settings. */
++@SuppressWarnings({"unused", "deprecation"})
++public class GigiFactCheckInfoPreference extends Preference {
++    static {
++        // Make sure the fact check settings are registered before the settings screen binds them.
++        Object unused = GigiFactCheckPatch.TELEGRAM_CHAT_ID;
++    }
++
++    public GigiFactCheckInfoPreference(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
++        super(context, attrs, defStyleAttr, defStyleRes);
++    }
++    public GigiFactCheckInfoPreference(Context context, AttributeSet attrs, int defStyleAttr) {
++        super(context, attrs, defStyleAttr);
++    }
++    public GigiFactCheckInfoPreference(Context context, AttributeSet attrs) {
++        super(context, attrs);
++    }
++    public GigiFactCheckInfoPreference(Context context) {
++        super(context);
++    }
++}
+diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckPatch.java
+new file mode 100644
+index 00000000..0f81acbe
+--- /dev/null
++++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckPatch.java
+@@ -0,0 +1,948 @@
++package app.morphe.extension.youtube.patches;
++
++import static java.lang.Boolean.TRUE;
++
 +import android.app.Activity;
++import android.app.AlertDialog;
++import android.content.ActivityNotFoundException;
 +import android.content.ClipData;
 +import android.content.ContentResolver;
 +import android.content.ContentValues;
@@ -365,6 +402,8 @@ index 00000000..cc871581
 +import app.morphe.extension.shared.ResourceType;
 +import app.morphe.extension.shared.ResourceUtils;
 +import app.morphe.extension.shared.Utils;
++import app.morphe.extension.shared.settings.BooleanSetting;
++import app.morphe.extension.shared.settings.StringSetting;
 +import app.morphe.extension.shared.spoof.ClientType;
 +import app.morphe.extension.shared.spoof.requests.StreamingDataRequest;
 +import app.morphe.extension.youtube.innertube.GigiFactCheckOuterClass.FactCheckCaptionTrack;
@@ -424,6 +463,26 @@ index 00000000..cc871581
 +
 +    private static final AtomicBoolean running = new AtomicBoolean();
 +
++    /**
++     * Numeric id of the fact check bot (the part of its token before ':').
++     * With it the file goes straight into the bot chat, if Telegram offers that chat as a share target.
++     */
++    public static final StringSetting TELEGRAM_CHAT_ID = new StringSetting("gigi_factcheck_chat_id", "");
++    /**
++     * If the Download button below the video asks between Fact check and Download.
++     */
++    public static final BooleanSetting DOWNLOAD_BUTTON_MENU = new BooleanSetting("gigi_factcheck_download_menu", TRUE);
++    /**
++     * If the captions are sent as a second file. Telegram can only open a chat directly for one file.
++     */
++    public static final BooleanSetting SEND_CAPTIONS = new BooleanSetting("gigi_factcheck_send_captions", TRUE);
++
++    private static final String[] TELEGRAM_PACKAGES = {
++            "org.telegram.messenger",
++            "org.telegram.messenger.web",
++            "org.telegram.messenger.beta",
++    };
++
 +    private record SharedFile(Uri uri, String mimeType) {
 +    }
 +
@@ -450,6 +509,55 @@ index 00000000..cc871581
 +            );
 +        } catch (Exception ex) {
 +            Logger.printException(() -> LOG_PREFIX + "initializeButton failure", ex);
++        }
++    }
++
++    /**
++     * Injection point.
++     * Called when the Download button below the video (next to Share) is tapped,
++     * and for the Download option of the menu of feed videos.
++     *
++     * @return If the tap was handled, otherwise the app or the Downloads patch handles it.
++     */
++    public static boolean onDownloadButtonClick(@Nullable String videoId) {
++        try {
++            if (!DOWNLOAD_BUTTON_MENU.get() || TextUtils.isEmpty(videoId)) {
++                return false;
++            }
++            Activity activity = Utils.getActivity();
++            if (activity == null) {
++                return false;
++            }
++            new AlertDialog.Builder(activity)
++                    .setItems(new CharSequence[]{"Fact check → Telegram", "Download"}, (dialog, which) -> {
++                        if (which == 0) {
++                            start(videoId);
++                        } else {
++                            download(videoId);
++                        }
++                    })
++                    .show();
++            return true;
++        } catch (Exception ex) {
++            Logger.printException(() -> LOG_PREFIX + "onDownloadButtonClick failure", ex);
++            return false;
++        }
++    }
++
++    /**
++     * Downloads the video the way the Downloads patch is set to, or else saves it in-app.
++     */
++    private static void download(String videoId) {
++        try {
++            if (DownloadsPatch.canDownloadWithoutAppButton()) {
++                DownloadsPatch.downloadVideoWithoutAppButton(videoId);
++            } else {
++                // The tap was taken from the app, so its own downloader cannot be opened anymore.
++                InAppDownloadsPatch.saveVideo(videoId);
++            }
++        } catch (Exception ex) {
++            Logger.printException(() -> LOG_PREFIX + "download failure", ex);
++            toast("download failed");
 +        }
 +    }
 +
@@ -658,7 +766,7 @@ index 00000000..cc871581
 +        deleteOldSharedFiles(context);
 +        ArrayList<SharedFile> shared = new ArrayList<>();
 +        shared.add(new SharedFile(publish(context, media, mediaName, mediaMimeType), mediaMimeType));
-+        if (captionsFile != null) {
++        if (captionsFile != null && SEND_CAPTIONS.get()) {
 +            try {
 +                shared.add(new SharedFile(publish(context, captionsFile, captionsName, "text/vtt"), "text/vtt"));
 +            } catch (Exception ex) {
@@ -1103,41 +1211,84 @@ index 00000000..cc871581
 +
 +    private static void share(ArrayList<SharedFile> files, String caption) {
 +        try {
-+            Intent send;
-+            if (files.size() == 1) {
-+                send = new Intent(Intent.ACTION_SEND);
-+                send.setType(files.get(0).mimeType());
-+                send.putExtra(Intent.EXTRA_STREAM, files.get(0).uri());
-+            } else {
-+                ArrayList<Uri> uris = new ArrayList<>();
-+                for (SharedFile file : files) uris.add(file.uri());
-+                send = new Intent(Intent.ACTION_SEND_MULTIPLE);
-+                send.setType("*/*");
-+                send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
-+            }
-+            send.putExtra(Intent.EXTRA_TEXT, caption);
-+
-+            ClipData clip = ClipData.newRawUri(BUTTON_TEXT, files.get(0).uri());
-+            for (int i = 1; i < files.size(); i++) {
-+                clip.addItem(new ClipData.Item(files.get(i).uri()));
-+            }
-+            send.setClipData(clip);
-+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-+
 +            // Some apps drop the text of a share that has files, so it can also be pasted.
 +            Utils.setClipboard(caption);
 +
-+            Intent chooser = Intent.createChooser(send, BUTTON_TEXT);
 +            Activity activity = Utils.getActivity();
-+            if (activity != null) {
-+                activity.startActivity(chooser);
-+            } else {
-+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-+                Utils.getContext().startActivity(chooser);
++            Context context = activity != null ? activity : Utils.getContext();
++            String chatId = TELEGRAM_CHAT_ID.get().trim();
++
++            // Telegram opens a chat directly only for a single file, and only a chat
++            // it offers as a share target (a recent or frequent chat).
++            if (!chatId.isEmpty() && files.size() == 1) {
++                for (String telegram : TELEGRAM_PACKAGES) {
++                    Intent direct = buildSendIntent(files, caption);
++                    direct.setPackage(telegram);
++                    direct.putExtra(Intent.EXTRA_SHORTCUT_ID, "did3_" + chatId);
++                    if (startActivity(context, direct)) {
++                        Logger.printInfo(() -> LOG_PREFIX + "shared straight to the chat: " + chatId + " in: " + telegram);
++                        return;
++                    }
++                }
++            }
++
++            // Telegram with its own chat picker.
++            for (String telegram : TELEGRAM_PACKAGES) {
++                Intent send = buildSendIntent(files, caption);
++                send.setPackage(telegram);
++                if (startActivity(context, send)) {
++                    Logger.printInfo(() -> LOG_PREFIX + "shared to: " + telegram);
++                    return;
++                }
++            }
++
++            // No Telegram: the system share sheet.
++            Intent chooser = Intent.createChooser(buildSendIntent(files, caption), BUTTON_TEXT);
++            if (!startActivity(context, chooser)) {
++                toast("could not open the share sheet");
 +            }
 +        } catch (Exception ex) {
 +            Logger.printInfo(() -> LOG_PREFIX + "share failed", ex);
 +            toast("could not open the share sheet");
++        }
++    }
++
++    private static Intent buildSendIntent(ArrayList<SharedFile> files, String caption) {
++        Intent send;
++        if (files.size() == 1) {
++            send = new Intent(Intent.ACTION_SEND);
++            send.setType(files.get(0).mimeType());
++            send.putExtra(Intent.EXTRA_STREAM, files.get(0).uri());
++        } else {
++            ArrayList<Uri> uris = new ArrayList<>();
++            for (SharedFile file : files) uris.add(file.uri());
++            send = new Intent(Intent.ACTION_SEND_MULTIPLE);
++            send.setType("*/*");
++            send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
++        }
++        send.putExtra(Intent.EXTRA_TEXT, caption);
++
++        ClipData clip = ClipData.newRawUri(BUTTON_TEXT, files.get(0).uri());
++        for (int i = 1; i < files.size(); i++) {
++            clip.addItem(new ClipData.Item(files.get(i).uri()));
++        }
++        send.setClipData(clip);
++        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
++        return send;
++    }
++
++    /**
++     * @return If an app took the intent.
++     */
++    private static boolean startActivity(Context context, Intent intent) {
++        try {
++            if (!(context instanceof Activity)) {
++                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++            }
++            context.startActivity(intent);
++            return true;
++        } catch (ActivityNotFoundException ex) {
++            return false;
 +        }
 +    }
 +
@@ -1822,10 +1973,10 @@ index 00000000..c0bb4351
 +    }
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
-index a6d44dcd..ce44ca8d 100644
+index 7a85bec8..3b85282b 100644
 --- a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
-@@ -793,6 +793,26 @@ public final class FlyoutUtils {
+@@ -795,6 +795,26 @@ public final class FlyoutUtils {
              );
          }
  
@@ -1937,13 +2088,23 @@ index 6f3a1f07..ee88e1d1 100644
  }
 diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/interaction/gigifactcheck/GigiFactCheckPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/interaction/gigifactcheck/GigiFactCheckPatch.kt
 new file mode 100644
-index 00000000..6913c9b9
+index 00000000..11948f8c
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/youtube/interaction/gigifactcheck/GigiFactCheckPatch.kt
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,98 @@
 +package app.morphe.patches.youtube.interaction.gigifactcheck
 +
++import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 +import app.morphe.patcher.patch.patch
++import app.morphe.patches.shared.misc.settings.preference.InputType
++import app.morphe.patches.shared.misc.settings.preference.NonInteractivePreference
++import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference
++import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference.Sorting
++import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
++import app.morphe.patches.shared.misc.settings.preference.TextPreference
++import app.morphe.patches.youtube.interaction.downloads.YouTubeOfflineVideoEndpointFingerprint
++import app.morphe.patches.youtube.interaction.downloads.downloadsPatch
++import app.morphe.patches.youtube.misc.settings.PreferenceScreen
 +import app.morphe.patches.youtube.layout.flyout.flyoutPatch
 +import app.morphe.patches.youtube.layout.player.buttons.addPlayerBottomButton
 +import app.morphe.patches.youtube.layout.player.buttons.playerOverlayButtonsHookPatch
@@ -1974,7 +2135,8 @@ index 00000000..6913c9b9
 +@Suppress("unused")
 +val gigiFactCheckPatch = patch(
 +    name = "Fact check button",
-+    description = "Adds a Fact check button to the video player, and to the menu of Shorts. " +
++    description = "Adds Fact check to the Download button below the video, a Fact check button to the player " +
++        "and to the menu of Shorts. " +
 +        "It downloads the video on the phone (at most 20 MB, or else only its audio), " +
 +        "then opens the share sheet with the file, its captions and a caption text. (GigiMorphs)",
 +) {
@@ -1987,11 +2149,42 @@ index 00000000..6913c9b9
 +        spoofVideoStreamsPatch,
 +        playerOverlayButtonsHookPatch,
 +        videoInformationPatch,
++        // Its Download button hook is added first, so the hook added here runs before it.
++        downloadsPatch,
 +    )
 +
 +    compatibleWith(COMPATIBILITY_YOUTUBE)
 +
 +    execute {
++        PreferenceScreen.MISC.addPreferences(
++            PreferenceScreenPreference(
++                key = "gigi_factcheck_screen",
++                sorting = Sorting.UNSORTED,
++                preferences = setOf(
++                    NonInteractivePreference(
++                        "gigi_factcheck_info",
++                        tag = "app.morphe.extension.youtube.patches.GigiFactCheckInfoPreference",
++                    ),
++                    SwitchPreference("gigi_factcheck_download_menu"),
++                    SwitchPreference("gigi_factcheck_send_captions"),
++                    TextPreference("gigi_factcheck_chat_id", inputType = InputType.NUMBER),
++                ),
++            ),
++        )
++
++        // The Download button below the video, next to Share.
++        YouTubeOfflineVideoEndpointFingerprint.method.addInstructionsWithLabels(
++            0,
++            """
++                invoke-static/range { p3 .. p3 }, $EXTENSION_CLASS->onDownloadButtonClick(Ljava/lang/String;)Z
++                move-result v0
++                if-eqz v0, :gigi_not_fact_check
++                return-void
++                :gigi_not_fact_check
++                nop
++            """
++        )
++
 +        addPlayerBottomButton(EXTENSION_CLASS)
 +
 +        setExtensionIsPatchIncluded(EXTENSION_CLASS)
@@ -2330,10 +2523,10 @@ index 00000000..cbca8525
 +    }
 +}
 diff --git a/patches/src/main/resources/addresources/values/youtube/strings.xml b/patches/src/main/resources/addresources/values/youtube/strings.xml
-index c0bfaa34..60989e02 100644
+index f8c61b65..51a677a4 100644
 --- a/patches/src/main/resources/addresources/values/youtube/strings.xml
 +++ b/patches/src/main/resources/addresources/values/youtube/strings.xml
-@@ -2166,4 +2166,15 @@ Automatic recording is optional. It stops in incognito or when the account chang
+@@ -2162,4 +2162,27 @@ Automatic recording is optional. It stops in incognito or when the account chang
      <string name="morphe_live_chat_translate_max_length_title">Maximum message length</string>
      <string name="morphe_live_chat_translate_max_length_summary">Longer messages are shown untranslated</string>
      <string name="morphe_live_chat_translate_max_length_no_limit">No limit</string>
@@ -2348,6 +2541,18 @@ index c0bfaa34..60989e02 100644
 +    <string name="gigi_logs_token_summary" translatable="false">Fine-grained token with Contents read and write on the logs repo only</string>
 +    <string name="gigi_logs_repo_title" translatable="false">Logs repo</string>
 +    <string name="gigi_logs_repo_summary" translatable="false">owner/name of the private repo the logs go to</string>
++    <string name="gigi_factcheck_screen_title" translatable="false">Fact check (GigiMorphs)</string>
++    <string name="gigi_factcheck_screen_summary" translatable="false">Send videos to your fact check Telegram bot</string>
++    <string name="gigi_factcheck_info_title" translatable="false">How it works</string>
++    <string name="gigi_factcheck_info_summary" translatable="false">Tap Download below a video and pick Fact check, or tap the Fact check button in the player. The video is downloaded on the phone (at most 20 MB, else audio only) and opened in Telegram with a #factcheck caption.</string>
++    <string name="gigi_factcheck_download_menu_title" translatable="false">Fact check on the Download button</string>
++    <string name="gigi_factcheck_download_menu_summary_on" translatable="false">The Download button below the video asks: Fact check or Download</string>
++    <string name="gigi_factcheck_download_menu_summary_off" translatable="false">The Download button only downloads</string>
++    <string name="gigi_factcheck_send_captions_title" translatable="false">Send captions file</string>
++    <string name="gigi_factcheck_send_captions_summary_on" translatable="false">Captions are sent as a second file. Telegram then asks for the chat</string>
++    <string name="gigi_factcheck_send_captions_summary_off" translatable="false">Only the video is sent, so Telegram can open the bot chat directly</string>
++    <string name="gigi_factcheck_chat_id_title" translatable="false">Bot chat id</string>
++    <string name="gigi_factcheck_chat_id_summary" translatable="false">Numeric id of the bot (the part of its token before the colon). Opens the bot chat directly when Telegram offers it as a share target</string>
  </resources>
 diff --git a/patches/src/main/resources/gigifactcheck/drawable/gigi_yt_fact_check.xml b/patches/src/main/resources/gigifactcheck/drawable/gigi_yt_fact_check.xml
 new file mode 100644

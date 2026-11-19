@@ -2173,4 +2173,16 @@ Automatic recording is optional. It stops in incognito or when the account chang
     <string name="gigi_logs_token_summary" translatable="false">Fine-grained token with Contents read and write on the logs repo only</string>
     <string name="gigi_logs_repo_title" translatable="false">Logs repo</string>
     <string name="gigi_logs_repo_summary" translatable="false">owner/name of the private repo the logs go to</string>
+    <string name="gigi_factcheck_screen_title" translatable="false">Fact check (GigiMorphs)</string>
+    <string name="gigi_factcheck_screen_summary" translatable="false">Send videos to your fact check Telegram bot</string>
+    <string name="gigi_factcheck_info_title" translatable="false">How it works</string>
+    <string name="gigi_factcheck_info_summary" translatable="false">Tap Download below a video and pick Fact check, or tap the Fact check button in the player. The video is downloaded on the phone (at most 20 MB, else audio only) and opened in Telegram with a #factcheck caption.</string>
+    <string name="gigi_factcheck_download_menu_title" translatable="false">Fact check on the Download button</string>
+    <string name="gigi_factcheck_download_menu_summary_on" translatable="false">The Download button below the video asks: Fact check or Download</string>
+    <string name="gigi_factcheck_download_menu_summary_off" translatable="false">The Download button only downloads</string>
+    <string name="gigi_factcheck_send_captions_title" translatable="false">Send captions file</string>
+    <string name="gigi_factcheck_send_captions_summary_on" translatable="false">Captions are sent as a second file. Telegram then asks for the chat</string>
+    <string name="gigi_factcheck_send_captions_summary_off" translatable="false">Only the video is sent, so Telegram can open the bot chat directly</string>
+    <string name="gigi_factcheck_chat_id_title" translatable="false">Bot chat id</string>
+    <string name="gigi_factcheck_chat_id_summary" translatable="false">Numeric id of the bot (the part of its token before the colon). Opens the bot chat directly when Telegram offers it as a share target</string>
 </resources>

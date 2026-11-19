@@ -1,6 +1,10 @@
 package app.morphe.extension.youtube.patches;
 
+import static java.lang.Boolean.TRUE;
+
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ContentResolver;
 import android.content.ContentValues;
@@ -41,6 +45,8 @@ import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.ResourceType;
 import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
+import app.morphe.extension.shared.settings.BooleanSetting;
+import app.morphe.extension.shared.settings.StringSetting;
 import app.morphe.extension.shared.spoof.ClientType;
 import app.morphe.extension.shared.spoof.requests.StreamingDataRequest;
 import app.morphe.extension.youtube.innertube.GigiFactCheckOuterClass.FactCheckCaptionTrack;
@@ -100,6 +106,26 @@ public final class GigiFactCheckPatch {
 
     private static final AtomicBoolean running = new AtomicBoolean();
 
+    /**
+     * Numeric id of the fact check bot (the part of its token before ':').
+     * With it the file goes straight into the bot chat, if Telegram offers that chat as a share target.
+     */
+    public static final StringSetting TELEGRAM_CHAT_ID = new StringSetting("gigi_factcheck_chat_id", "");
+    /**
+     * If the Download button below the video asks between Fact check and Download.
+     */
+    public static final BooleanSetting DOWNLOAD_BUTTON_MENU = new BooleanSetting("gigi_factcheck_download_menu", TRUE);
+    /**
+     * If the captions are sent as a second file. Telegram can only open a chat directly for one file.
+     */
+    public static final BooleanSetting SEND_CAPTIONS = new BooleanSetting("gigi_factcheck_send_captions", TRUE);
+
+    private static final String[] TELEGRAM_PACKAGES = {
+            "org.telegram.messenger",
+            "org.telegram.messenger.web",
+            "org.telegram.messenger.beta",
+    };
+
     private record SharedFile(Uri uri, String mimeType) {
     }
 
@@ -126,6 +152,55 @@ public final class GigiFactCheckPatch {
             );
         } catch (Exception ex) {
             Logger.printException(() -> LOG_PREFIX + "initializeButton failure", ex);
+        }
+    }
+
+    /**
+     * Injection point.
+     * Called when the Download button below the video (next to Share) is tapped,
+     * and for the Download option of the menu of feed videos.
+     *
+     * @return If the tap was handled, otherwise the app or the Downloads patch handles it.
+     */
+    public static boolean onDownloadButtonClick(@Nullable String videoId) {
+        try {
+            if (!DOWNLOAD_BUTTON_MENU.get() || TextUtils.isEmpty(videoId)) {
+                return false;
+            }
+            Activity activity = Utils.getActivity();
+            if (activity == null) {
+                return false;
+            }
+            new AlertDialog.Builder(activity)
+                    .setItems(new CharSequence[]{"Fact check → Telegram", "Download"}, (dialog, which) -> {
+                        if (which == 0) {
+                            start(videoId);
+                        } else {
+                            download(videoId);
+                        }
+                    })
+                    .show();
+            return true;
+        } catch (Exception ex) {
+            Logger.printException(() -> LOG_PREFIX + "onDownloadButtonClick failure", ex);
+            return false;
+        }
+    }
+
+    /**
+     * Downloads the video the way the Downloads patch is set to, or else saves it in-app.
+     */
+    private static void download(String videoId) {
+        try {
+            if (DownloadsPatch.canDownloadWithoutAppButton()) {
+                DownloadsPatch.downloadVideoWithoutAppButton(videoId);
+            } else {
+                // The tap was taken from the app, so its own downloader cannot be opened anymore.
+                InAppDownloadsPatch.saveVideo(videoId);
+            }
+        } catch (Exception ex) {
+            Logger.printException(() -> LOG_PREFIX + "download failure", ex);
+            toast("download failed");
         }
     }
 
@@ -334,7 +409,7 @@ public final class GigiFactCheckPatch {
         deleteOldSharedFiles(context);
         ArrayList<SharedFile> shared = new ArrayList<>();
         shared.add(new SharedFile(publish(context, media, mediaName, mediaMimeType), mediaMimeType));
-        if (captionsFile != null) {
+        if (captionsFile != null && SEND_CAPTIONS.get()) {
             try {
                 shared.add(new SharedFile(publish(context, captionsFile, captionsName, "text/vtt"), "text/vtt"));
             } catch (Exception ex) {
@@ -779,41 +854,84 @@ public final class GigiFactCheckPatch {
 
     private static void share(ArrayList<SharedFile> files, String caption) {
         try {
-            Intent send;
-            if (files.size() == 1) {
-                send = new Intent(Intent.ACTION_SEND);
-                send.setType(files.get(0).mimeType());
-                send.putExtra(Intent.EXTRA_STREAM, files.get(0).uri());
-            } else {
-                ArrayList<Uri> uris = new ArrayList<>();
-                for (SharedFile file : files) uris.add(file.uri());
-                send = new Intent(Intent.ACTION_SEND_MULTIPLE);
-                send.setType("*/*");
-                send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
-            }
-            send.putExtra(Intent.EXTRA_TEXT, caption);
-
-            ClipData clip = ClipData.newRawUri(BUTTON_TEXT, files.get(0).uri());
-            for (int i = 1; i < files.size(); i++) {
-                clip.addItem(new ClipData.Item(files.get(i).uri()));
-            }
-            send.setClipData(clip);
-            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
             // Some apps drop the text of a share that has files, so it can also be pasted.
             Utils.setClipboard(caption);
 
-            Intent chooser = Intent.createChooser(send, BUTTON_TEXT);
             Activity activity = Utils.getActivity();
-            if (activity != null) {
-                activity.startActivity(chooser);
-            } else {
-                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                Utils.getContext().startActivity(chooser);
+            Context context = activity != null ? activity : Utils.getContext();
+            String chatId = TELEGRAM_CHAT_ID.get().trim();
+
+            // Telegram opens a chat directly only for a single file, and only a chat
+            // it offers as a share target (a recent or frequent chat).
+            if (!chatId.isEmpty() && files.size() == 1) {
+                for (String telegram : TELEGRAM_PACKAGES) {
+                    Intent direct = buildSendIntent(files, caption);
+                    direct.setPackage(telegram);
+                    direct.putExtra(Intent.EXTRA_SHORTCUT_ID, "did3_" + chatId);
+                    if (startActivity(context, direct)) {
+                        Logger.printInfo(() -> LOG_PREFIX + "shared straight to the chat: " + chatId + " in: " + telegram);
+                        return;
+                    }
+                }
+            }
+
+            // Telegram with its own chat picker.
+            for (String telegram : TELEGRAM_PACKAGES) {
+                Intent send = buildSendIntent(files, caption);
+                send.setPackage(telegram);
+                if (startActivity(context, send)) {
+                    Logger.printInfo(() -> LOG_PREFIX + "shared to: " + telegram);
+                    return;
+                }
+            }
+
+            // No Telegram: the system share sheet.
+            Intent chooser = Intent.createChooser(buildSendIntent(files, caption), BUTTON_TEXT);
+            if (!startActivity(context, chooser)) {
+                toast("could not open the share sheet");
             }
         } catch (Exception ex) {
             Logger.printInfo(() -> LOG_PREFIX + "share failed", ex);
             toast("could not open the share sheet");
+        }
+    }
+
+    private static Intent buildSendIntent(ArrayList<SharedFile> files, String caption) {
+        Intent send;
+        if (files.size() == 1) {
+            send = new Intent(Intent.ACTION_SEND);
+            send.setType(files.get(0).mimeType());
+            send.putExtra(Intent.EXTRA_STREAM, files.get(0).uri());
+        } else {
+            ArrayList<Uri> uris = new ArrayList<>();
+            for (SharedFile file : files) uris.add(file.uri());
+            send = new Intent(Intent.ACTION_SEND_MULTIPLE);
+            send.setType("*/*");
+            send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+        }
+        send.putExtra(Intent.EXTRA_TEXT, caption);
+
+        ClipData clip = ClipData.newRawUri(BUTTON_TEXT, files.get(0).uri());
+        for (int i = 1; i < files.size(); i++) {
+            clip.addItem(new ClipData.Item(files.get(i).uri()));
+        }
+        send.setClipData(clip);
+        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        return send;
+    }
+
+    /**
+     * @return If an app took the intent.
+     */
+    private static boolean startActivity(Context context, Intent intent) {
+        try {
+            if (!(context instanceof Activity)) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+            context.startActivity(intent);
+            return true;
+        } catch (ActivityNotFoundException ex) {
+            return false;
         }
     }
 
