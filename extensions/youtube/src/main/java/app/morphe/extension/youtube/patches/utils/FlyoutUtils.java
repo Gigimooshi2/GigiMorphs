@@ -803,6 +803,16 @@ public final class FlyoutUtils {
             );
         }
 
+        // GigiMorphs.
+        if (app.morphe.extension.youtube.patches.GigiFactCheckPatch.isPatchIncluded()) {
+            nextButtonIndex = app.morphe.extension.youtube.patches.GigiFactCheckPatch.addFlyoutButton(
+                    flyoutPanel,
+                    nextButtonIndex,
+                    flyoutVideoId,
+                    isShortFlyout
+            );
+        }
+
         if (ExportDownloadButton.isPatchIncluded()) {
             nextButtonIndex = ExportDownloadButton.addFlyoutButton(
                     flyoutPanel,

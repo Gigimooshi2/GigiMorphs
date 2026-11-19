@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package app.morphe.extension.youtube.innertube.gigifactcheck;
+
+option optimize_for = LITE_RUNTIME;
+option java_package = "app.morphe.extension.youtube.innertube";
+option java_outer_classname = "GigiFactCheckOuterClass";
+
+// GigiMorphs: the parts of a player response the fact check button reads.
+message FactCheckPlayerResponse {
+    optional FactCheckStreamingData streamingData = 4;
+    optional FactCheckCaptions captions = 10;
+    optional FactCheckVideoDetails videoDetails = 11;
+}
+
+message FactCheckStreamingData {
+    // Streams with both video and audio.
+    repeated FactCheckFormat formats = 2;
+    // Streams with only video or only audio.
+    repeated FactCheckFormat adaptiveFormats = 3;
+}
+
+message FactCheckFormat {
+    optional int32 itag = 1;
+    optional string url = 2;
+    optional string mimeType = 5;
+    optional int32 bitrate = 6;
+    optional int64 contentLength = 12;
+    optional int32 averageBitrate = 31;
+    optional int64 approxDurationMs = 44;
+}
+
+message FactCheckCaptions {
+    optional FactCheckCaptionTracklist playerCaptionsTracklistRenderer = 51621377;
+}
+
+message FactCheckCaptionTracklist {
+    repeated FactCheckCaptionTrack captionTracks = 1;
+}
+
+message FactCheckCaptionTrack {
+    // Timedtext url. Its 'lang' and 'kind' parameters tell the language and if it is auto-generated.
+    optional string baseUrl = 1;
+}
+
+message FactCheckVideoDetails {
+    optional string videoId = 1;
+    optional string title = 15;
+    optional int32 lengthSeconds = 16;
+    optional string shortDescription = 21;
+    optional string author = 33;
+}
