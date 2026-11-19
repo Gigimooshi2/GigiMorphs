@@ -39,8 +39,11 @@ message FactCheckCaptionTracklist {
 }
 
 message FactCheckCaptionTrack {
-    // Timedtext url. Its 'lang' and 'kind' parameters tell the language and if it is auto-generated.
+    // Timedtext url.
     optional string baseUrl = 1;
+    optional string languageCode = 4;
+    // "asr" for auto-generated captions.
+    optional string kind = 5;
 }
 
 message FactCheckVideoDetails {
