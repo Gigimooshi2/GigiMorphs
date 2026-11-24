@@ -141,7 +141,7 @@ Puudutage OK, et avada Android System WebView."</string>
   <string name="morphe_spoof_video_streams_no_clients_suggest_vr_toast">Proovige aktiveerida: Videovoolude imiteerimine &gt; Android VR sisselogimine</string>
   <string name="morphe_spoof_video_streams_client_type_title">Vaikimisi klient</string>
   <!-- Ensure this translation matches the translation of morphe_spoof_video_streams_no_clients_suggest_vr_toast -->
-  <string name="morphe_spoof_video_streams_sign_in_android_vr_about_title">\'Android\' VR sisselogimine</string>
+  <string name="morphe_spoof_video_streams_sign_in_android_vr_about_title">\"Android VR\" sisselogimine</string>
   <string name="morphe_spoof_video_streams_sign_in_android_vr_about_summary">\'Android VR\' nõuab eraldi sisselogimist. Jätkamiseks puudutage siin</string>
   <string name="morphe_spoof_video_streams_sign_in_android_vr_about_summary_signed_in">Hetkel sisse logitud \'Android VR\'-i</string>
   <!-- "Default client" must be the same translated text as morphe_spoof_video_streams_client_type_title -->
@@ -168,13 +168,13 @@ Sisselogimiseks vajutage allpool jätkamist"</string>
 • Teie Morphe seaded ei importeeri ega eksporteeri Android VR autentimist
 • Kui seda rakendust ei kasutata 6 kuud, eemaldab Google selle autentimise
 • Peate uuesti sisse logima, kui muudate oma Google'i parooli või eemaldate selle seadme oma Google'i seadetest"</string>
-  <string name="morphe_spoof_video_streams_sign_in_mweb_about_title">Mobiiliveebi sisselogimine</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_about_title">\"Mobile Web\" sisselogimine</string>
   <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary">Valikuline: logige sisse YouTube\'i veebilehele, et videoid oma kontoga esitada. Jätkamiseks puudutage siia</string>
   <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary_signed_in">Hetkel on sisse logitud kontole \"Mobile Web\"</string>
   <!-- "Default client" must be the same translated text as morphe_spoof_video_streams_client_type_title -->
   <string name="morphe_spoof_video_streams_sign_in_mweb_about_summary_disabled">Selle funktsiooni kasutamiseks muutke \"Vaikimisi klient\" väärtuseks \"Mobile Web\"</string>
   <string name="morphe_spoof_video_streams_sign_in_mweb_dialog_title">Logige sisse kontole \"Mobile Web\"</string>
-  <string name="morphe_spoof_video_streams_sign_in_mweb_dialog_not_signed_in_message">"\"Mobiiliveeb\" esitab videoid ilma sisselogimiseta või YouTube'i veebisaidile sisselogitud oleku complacent
+  <string name="morphe_spoof_video_streams_sign_in_mweb_dialog_not_signed_in_message">"\"Mobile Web\" saab videoid vaadata nii välja logituna kui ka YouTube'i veebisaidile sisse logituna
 
 • Sisselogitud olekul saab esitada videoid, mille jaoks on vaja kontot, näiteks vanusepiiranguga videoid
 • Selles rakenduses avaneb Google'i sisselogimise lehekülg
@@ -187,8 +187,8 @@ Sisselogimiseks vajutage allpoolset nuppu Jätka"</string>
 • Teie Morphe seaded ei importeeri ega eksporteeri \"Mobiiliveebi\" sisselogimist
 • Kui Google lõpetab istundi, esitatakse videoid ilma sisselogimiseta, kuni logite uuesti sisse
 • Väljalogimine logib selle seadme ka YouTube'i veebisaidilt välja"</string>
-  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_expired">Mobiiliveebi sisselogimise aeg on aegunud, proovige \"Mobiiliveebi\" uuesti sisse logida</string>
-  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_signed_out">\"Mobiiliveebist\" logitud välja</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_expired">Mobile Web sisselogimise aeg on aegunud, proovige \"Mobile Web\" uuesti sisse logida</string>
+  <string name="morphe_spoof_video_streams_sign_in_mweb_toast_signed_out">\"Mobile Web\" logitud välja</string>
   <string name="morphe_spoof_video_streams_sign_in_mweb_toast_webview_missing">\"Android System WebView\" ei ole saadaval. Sisse logimiseks installige või aktiveerige see</string>
   <string name="morphe_oauth2_connection_failure_timeout">OAuth2 ei ole hetkel saadaval (API aeg läks läbi)</string>
   <string name="morphe_oauth2_connection_failure_status_400">\"Android VR\" sisselogimise aeg on aegunud, proovige VR-i uuesti sisse logida</string>
@@ -214,8 +214,15 @@ Sisselogimiseks vajutage allpoolset nuppu Jätka"</string>
   <string name="morphe_seek_notification_media_length_invalid">Otsingu pikkus peab olema 1 ja %s sekundi vahel. Kasutatakse vaikimisseadet</string>
   <!-- misc.quic.disableQUICProtocolPatch -->
   <string name="morphe_disable_quic_protocol_title">Võtta QUIC protokoll kasutusest</string>
+  <!-- video.quality.prioritizeVideoQualityPatch -->
+  <string name="morphe_prioritize_video_quality_title">Sea videokvaliteet esikohale</string>
+  <string name="morphe_prioritize_video_quality_summary">Eelistab koodeki tõhususele kõrgeimat saadaolevat videokvaliteeti</string>
+  <string name="morphe_prioritize_video_quality_dialog">Kui see seade on välja lülitatud, siis vanematel videotel ei pruugida olla videokvaliteedi valikuid</string>
   <!-- misc.audio.drc.disableDRCAudioPatch  -->
-  <string name="morphe_disable_drc_audio_title">Võtta DRC audio kasutusest</string>
+  <string name="morphe_disable_drc_audio_stream_title">Lülita DRC audio välja</string>
+  <string name="morphe_disable_drc_audio_stream_summary">Esitab algse heli, mitte kokkusurutud dünaamilise ulatusega versiooni</string>
+  <string name="morphe_disable_loudness_normalization_title">Väldi helitugevuse normaliseerimist</string>
+  <string name="morphe_disable_loudness_normalization_summary">Esitab tugevat heli algse kõvususega selle asemel, et langetada seda standardtasemele</string>
   <!-- misc.audio.tracks.forceOriginalAudioPatch -->
   <string name="morphe_force_original_audio_title">Sunni originaalne helikeel</string>
   <string name="morphe_force_original_audio_summary">Esitab alati video algset helirada dubleeritud versiooni asemel</string>
@@ -224,6 +231,32 @@ Sisselogimiseks vajutage allpoolset nuppu Jätka"</string>
   <string name="morphe_skip_silence_summary">Vaatab automaatselt üle vaikseid pause videovideos</string>
   <string name="morphe_skip_silence_minimum_pause_title">Minimaalne pausepikkus</string>
   <string name="morphe_skip_silence_minimum_pause_summary">Lühendatakse ainult neid pause, mis on vähemalt nii pikad. Jõustub järgmise video käivitamisel</string>
+  <!-- misc.videoeffects.videoEffectsPatch -->
+  <string name="morphe_video_effect_title">Videoefekt</string>
+  <string name="morphe_video_effect_entry_none">Väljas</string>
+  <string name="morphe_video_effects_custom_title">Muuda videoefekte</string>
+  <string name="morphe_video_effects_custom_summary">Muuda, nime own, kustuta või lisa videoefekte. Efektid on shaderi kood, nii et AI vestlusbot saab kirjutada uusi</string>
+  <string name="morphe_video_effects_custom_empty">Videoefekte pole. Puudutage nuppu Lisa efekt, et luua uus.</string>
+  <string name="morphe_video_effects_custom_add">Lisa efekt</string>
+  <string name="morphe_video_effects_custom_restore">Taasta vaikeväärtused</string>
+  <string name="morphe_video_effects_custom_add_title">Uus efekt</string>
+  <string name="morphe_video_effects_custom_edit_title">Redigeeri efekti</string>
+  <string name="morphe_video_effects_custom_name_hint">Nimi</string>
+  <string name="morphe_video_effects_custom_name_empty">Sisestage efekti nimi</string>
+  <string name="morphe_video_effects_custom_name_exists">Selle nimega efekt on juba olemas</string>
+  <string name="morphe_video_effects_custom_copy_code">Kopeeri kood</string>
+  <string name="morphe_video_effects_custom_error_title">Efektil on viga</string>
+  <string name="morphe_video_effects_custom_error_message">"Videoid kuvatakse ilma efektita seni, kuni kood on parandatud. Saatke see viga tehisintellektile, kes koodi kirjutas:
+
+%s"</string>
+  <string name="morphe_video_effects_custom_cut_off_message">"Kood lõppeb funktsiooni või kommentaari sees, seega on see tõenäoliselt kopeerimise või liimimise käigus katkestunud. Liimitud tekst võib katkestuda %d märgi juures.
+
+Paluge tehisintellektilt lühemat koodi või liimige kood osade kaugu."</string>
+  <string name="morphe_video_effects_custom_copy_error">Kopeerimise viga</string>
+  <string name="morphe_video_effects_custom_save_anyway">Salvesta ikkagi</string>
+  <string name="morphe_video_effects_custom_delete">Kustuta</string>
+  <string name="morphe_video_effects_custom_delete_title">Kas kustutada efekt?</string>
+  <string name="morphe_video_effects_custom_delete_message">%s kustutatakse.</string>
   <!-- misc.proxy.networkProxyPatch -->
   <string name="morphe_proxy_screen_title">Proksiserveri ühendus</string>
   <string name="morphe_proxy_screen_summary">Suunake toetatud võrgupäringud läbi proksi</string>
@@ -340,6 +373,18 @@ Kui see hiljem välja lülitada, on soovitatav puhastada rakenduse andmed, et v�
   <string name="morphe_custom_font_file_summary">Valige TTF või OTF fondifail</string>
   <string name="morphe_custom_font_file_invalid">Valitud fail ei ole TTF või OTF font</string>
   <string name="morphe_custom_font_failed_to_load">Kohandatud fonti ei õnnestunud laadida ja see on välja lülitatud</string>
+  <!-- layout.glassmenus.glassMenusPatch -->
+  <string name="morphe_glass_menus_screen_title">Klaasmenüüd</string>
+  <string name="morphe_glass_menus_screen_summary">Menüüd on nagu matte klaas häguse sisu kohal</string>
+  <string name="morphe_glass_menus_title">Luba klaasmenüüd</string>
+  <string name="morphe_glass_menus_summary">Kuvab menüüd ja alumised paneelid kui matt klaas, kus nende taga olev sisu on hägusetatud</string>
+  <string name="morphe_glass_menus_user_dialog_message">Menüüd on peaaegu läbivaatamatud, kui akusäästaja on sisse lülitatud või kui seade ei toeta hägusefekti</string>
+  <string name="morphe_glass_menus_opacity_title">Klaasi läbipaistmatus</string>
+  <string name="morphe_glass_menus_opacity_summary">Kui palju menüü katab häguse sisu (0 on läbipaistev, 100 on läbivaatamatu)</string>
+  <string name="morphe_glass_menus_blur_title">Hägu</string>
+  <string name="morphe_glass_menus_blur_summary">Kui palju on menüü taga olev sisu hägune</string>
+  <string name="morphe_glass_menus_dim_title">Hämarus</string>
+  <string name="morphe_glass_menus_dim_summary">Kui palju on alumse lehe ümber olev ekraan pimestatud</string>
   <!-- layout.returnyoutubedislike.returnYouTubeDislikePatch -->
   <!-- Brief notification (toast) shown if network connection times out. Translations of this should not be longer than the original English text, otherwise the text can be clipped and not entirely shown. -->
   <string name="morphe_ryd_failure_connection_timeout">Mittemeeldimised ei ole hetkel saadaval (API aeg läks läbi)</string>

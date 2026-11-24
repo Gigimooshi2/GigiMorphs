@@ -103,6 +103,8 @@ private const val EXPLORE_MENU_FILTER =
     "Lapp/morphe/extension/youtube/patches/components/ExploreMenuFilter;"
 private const val COMMENTS_FILTER =
     "Lapp/morphe/extension/youtube/patches/components/CommentsFilter;"
+private const val VIEW_COUNT_FILTER =
+    "Lapp/morphe/extension/youtube/patches/components/ViewCountFilter;"
 private const val CUSTOM_FILTER =
     "Lapp/morphe/extension/youtube/patches/components/CustomFilter;"
 private const val KEYWORD_FILTER =
@@ -200,14 +202,15 @@ val hideLayoutComponentsPatch = patch(
                     SwitchPreference("morphe_hide_comments_live_chat_scroll_to_bottom_button"),
                     SwitchPreference("morphe_hide_comments_live_chat_tooltips", summary = true),
                     SwitchPreference("morphe_hide_comments_menu_button", summary = true),
+                    SwitchPreference("morphe_hide_comments_none_yet"),
                     SwitchPreference("morphe_hide_comments_preview_comment", summary = true),
-                    SwitchPreference("morphe_hide_comments_zero_state"),
                     SwitchPreference("morphe_minimal_comments_button", summary = true),
                     SwitchPreference("morphe_hide_comments_thanks_button", titleKey = "morphe_hide_thanks_button_title"),
                     SwitchPreference("morphe_hide_comments_timestamp_button"),
                     SwitchPreference("morphe_hide_comments_top_fans_button"),
                     SwitchPreference("morphe_hide_comments_topics", summary = true),
                     SwitchPreference("morphe_hide_comments_translate_button"),
+                    SwitchPreference("morphe_hide_comments_visit_the_community_section"),
                     SwitchPreference("morphe_sanitize_comments_highlighted_search_links", summary = true)
                 ),
                 sorting = Sorting.UNSORTED
@@ -271,6 +274,7 @@ val hideLayoutComponentsPatch = patch(
                 sorting = Sorting.UNSORTED,
                 preferences = setOf(
                     SwitchPreference("morphe_hide_keyword_content_comments"),
+                    SwitchPreference("morphe_hide_keyword_content_posts"),
                     SwitchPreference("morphe_hide_keyword_content_home"),
                     SwitchPreference("morphe_hide_keyword_content_search"),
                     SwitchPreference("morphe_hide_keyword_content_subscriptions"),
@@ -293,6 +297,27 @@ val hideLayoutComponentsPatch = patch(
                             NonInteractivePreference(
                                 key = "morphe_hide_keyword_content_about_whole_words",
                                 tag = "app.morphe.extension.youtube.settings.preference.HTMLPreference"
+                            )
+                        )
+                    )
+                )
+            ),
+            PreferenceScreenPreference(
+                key = "morphe_hide_videos_by_views_screen",
+                sorting = Sorting.UNSORTED,
+                preferences = setOf(
+                    SwitchPreference("morphe_hide_videos_by_views_home"),
+                    SwitchPreference("morphe_hide_videos_by_views_search"),
+                    SwitchPreference("morphe_hide_videos_by_views_subscriptions"),
+                    TextPreference("morphe_hide_videos_by_views_minimum", inputType = InputType.NUMBER),
+                    TextPreference("morphe_hide_videos_by_views_maximum", inputType = InputType.NUMBER),
+                    screenInfoPreferenceCategory(
+                        key = "morphe_hide_videos_by_views_about_category",
+                        preferences = setOf(
+                            NonInteractivePreference(
+                                key = "morphe_hide_videos_by_views_about",
+                                titleKey = null,
+                                tag = "app.morphe.extension.shared.settings.preference.BulletPointPreference"
                             )
                         )
                     )
@@ -441,6 +466,7 @@ val hideLayoutComponentsPatch = patch(
         }
         addLithoFilter(COMMENTS_FILTER)
         addLithoFilter(KEYWORD_FILTER)
+        addLithoFilter(VIEW_COUNT_FILTER)
         addLithoFilter(CUSTOM_FILTER)
         addSpanFilter(SANITIZE_VIDEO_SUBTITLE_FILTER)
         addSpanFilter(SEARCH_LINKS_FILTER)

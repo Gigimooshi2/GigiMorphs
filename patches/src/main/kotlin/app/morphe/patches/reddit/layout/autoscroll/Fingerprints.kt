@@ -70,23 +70,6 @@ internal object MainActivityOnPauseFingerprint : Fingerprint(
 )
 
 /**
- * BottomNavScreen.onNavBarStateChange(float), called with the fraction of the navigation bar
- * that is shown.
- */
-internal object NavBarStateChangeFingerprint : Fingerprint(
-    definingClass = "Lcom/reddit/launch/bottomnav/BottomNavScreen;",
-    returnType = "V",
-    parameters = listOf("F"),
-    filters = listOf(
-        // The coroutine class is BottomNavScreen$onNavBarStateChange$1$1 in older app versions.
-        methodCall(
-            definingClass = "Lcom/reddit/launch/bottomnav/BottomNavScreen\$onNavBarStateChange\$1",
-            name = "<init>"
-        )
-    )
-)
-
-/**
  * Inflates the view of the post detail pager.
  */
 internal object PostDetailPagerInflateFingerprint : Fingerprint(
@@ -118,6 +101,19 @@ internal object ScreenAttachFingerprint : Fingerprint(
 )
 
 /**
+ * Attached callback of a screen in the navigation stack, for app versions before 2026.40.0.
+ */
+internal object ScreenAttachLegacyFingerprint : Fingerprint(
+    definingClass = "Lcom/reddit/navstack/",
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "V",
+    parameters = listOf("Landroid/view/View;"),
+    filters = listOf(
+        fieldAccess(definingClass = "Landroidx/lifecycle/Lifecycle\$Event;", name = "ON_RESUME")
+    )
+)
+
+/**
  * Detached callback of a screen in the navigation stack.
  */
 internal object ScreenDetachFingerprint : Fingerprint(
@@ -129,5 +125,20 @@ internal object ScreenDetachFingerprint : Fingerprint(
         fieldAccess(definingClass = "Landroidx/lifecycle/Lifecycle\$State;", name = "RESUMED"),
         methodCall(definingClass = "Landroidx/lifecycle/Lifecycle\$State;", name = "isAtLeast"),
         fieldAccess(definingClass = "Landroidx/lifecycle/Lifecycle\$State;", name = "STARTED")
+    )
+)
+
+/**
+ * Detached callback of a screen in the navigation stack, for app versions before 2026.40.0.
+ */
+internal object ScreenDetachLegacyFingerprint : Fingerprint(
+    definingClass = "Lcom/reddit/navstack/",
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "V",
+    parameters = listOf("Landroid/view/View;"),
+    filters = listOf(
+        fieldAccess(definingClass = "Landroidx/lifecycle/Lifecycle\$State;", name = "RESUMED"),
+        methodCall(definingClass = "Landroidx/lifecycle/Lifecycle\$State;", name = "isAtLeast"),
+        fieldAccess(definingClass = "Landroidx/lifecycle/Lifecycle\$Event;", name = "ON_PAUSE")
     )
 )

@@ -30,6 +30,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.view.ViewStub;
 import android.view.WindowInsets;
 import android.widget.ImageView;
@@ -52,6 +53,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,6 +90,7 @@ import app.morphe.extension.shared.innertube.GuideResponseOuterClass.PivotBarIte
 import app.morphe.extension.shared.innertube.GuideResponseOuterClass.PivotBarItemRendererBytes;
 import app.morphe.extension.shared.innertube.GuideResponseOuterClass.RendererAccessibilityData;
 import app.morphe.extension.shared.innertube.GuideResponseOuterClass.Runs;
+import app.morphe.extension.shared.innertube.GuideResponseOuterClass.SignInEndpoint;
 import app.morphe.extension.shared.innertube.GuideResponseOuterClass.Title;
 import app.morphe.extension.shared.innertube.IconOuterClass.Icon;
 import app.morphe.extension.shared.innertube.IconOuterClass.YTIconType;
@@ -242,34 +245,21 @@ public final class NavigationBarPatch {
         if (SHOW_SETTINGS_BUTTON && button == NavigationBar.NavigationButton.SETTINGS) {
             settingsTabRef = new WeakReference<>(tabView);
             Utils.runOnMainThread(() -> {
-                tabView.setOnClickListener(v -> {
-                    // The tap that ends a long press is not a click.
-                    if (settingsTabLongPressed) {
-                        settingsTabLongPressed = false;
-                        return;
-                    }
-                    if (SHOW_SETTINGS_BUTTON_TYPE) {
-                        openMorpheSettings(v);
-                    } else {
-                        openYouTubeSettings(v);
-                    }
-                });
-                tabView.setOnLongClickListener(v -> {
-                    if (settingsTabTouched) {
-                        // The long press of the navigation bar and of the view itself
-                        // can both be called for the same touch.
-                        if (settingsTabLongPressed) return true;
-                        settingsTabLongPressed = true;
-                    }
-                    if (SHOW_SETTINGS_BUTTON_TYPE) {
-                        openYouTubeSettings(v);
-                    } else {
-                        openMorpheSettings(v);
-                    }
-                    return true;
-                });
+                if (SHOW_SETTINGS_BUTTON_TYPE) {
+                    tabView.setOnClickListener(NavigationBarPatch::openMorpheSettings);
+                    setTabLongPressAction(tabView, NavigationBarPatch::openYouTubeSettings);
+                } else {
+                    tabView.setOnClickListener(NavigationBarPatch::openYouTubeSettings);
+                    setTabLongPressAction(tabView, NavigationBarPatch::openMorpheSettings);
+                }
             });
             return;
+        }
+
+        if (YOU_BUTTON_ACCOUNT_SWITCHER && button == NavigationBar.NavigationButton.LIBRARY) {
+            youTabRef = new WeakReference<>(tabView);
+            // The app sets its own long press listener on the button after the button is created.
+            Utils.runOnMainThread(() -> setTabLongPressAction(tabView, NavigationBarPatch::openAccountSwitcher));
         }
 
         // The dot is a stub that is inflated when the tab has new content, and the app shows and
@@ -390,6 +380,59 @@ public final class NavigationBarPatch {
     private static int pageRoomPadding;
 
     /**
+     * The heights the app keeps of the views at the bottom of the screen, with a method added during patching.
+     */
+    public interface BottomUiHeightsAccess {
+        /**
+         * Sets the height of a view at the bottom of the screen.
+         */
+        void patch_setBottomUiHeight(Enum<?> view, int height);
+    }
+
+    /**
+     * Name of the navigation bar in the views at the bottom of the screen.
+     */
+    private static final String BOTTOM_UI_NAVIGATION_BAR = "PIVOT_BAR";
+
+    /**
+     * The navigation bar in the views at the bottom of the screen.
+     */
+    @Nullable
+    private static Enum<?> bottomUiNavigationBar;
+
+    /**
+     * The heights the app set the height of the navigation bar in, as it keeps the heights in more than one place,
+     * each with the last height the app set. Accessed only on the main thread.
+     */
+    private static final Map<BottomUiHeightsAccess, Integer> bottomUiNavigationBarHeights = new WeakHashMap<>();
+
+    /**
+     * Injection point.
+     * <p>
+     * The app places the miniplayer and other views above the height it keeps for the navigation bar,
+     * which it sets to none only when it hides the bar itself. While the bar is hidden on scroll,
+     * the height of the bar is none.
+     *
+     * @return The height of the view to set.
+     */
+    public static int getBottomUiHeight(BottomUiHeightsAccess heights, Enum<?> view, int height) {
+        if (!HIDE_NAVIGATION_BAR_ON_SCROLL) return height;
+
+        try {
+            if (view != bottomUiNavigationBar) {
+                if (!BOTTOM_UI_NAVIGATION_BAR.equals(view.name())) return height;
+                bottomUiNavigationBar = view;
+            }
+            bottomUiNavigationBarHeights.put(heights, height);
+            return navigationBarHiddenOnScroll ? 0 : height;
+        } catch (Exception ex) {
+            Logger.printException(() -> "getBottomUiHeight failure", ex);
+        }
+
+        return height;
+    }
+
+    /**
      * Injection point.
      * <p>
      * Called on the main thread when any list scrolls, before its scroll listeners.
@@ -420,9 +463,9 @@ public final class NavigationBarPatch {
             if (!navigationBarScrollObserversAdded) {
                 navigationBarScrollObserversAdded = true;
                 // Opening the player, the Shorts, or another tab shows the navigation bar again.
-                // The feed videos that play while scrolling do not.
+                // The feed videos that play while scrolling, and the miniplayer, do not.
                 PlayerType.getOnChange().addObserver(type -> {
-                    if (!type.isNoneOrHidden() && type != PlayerType.INLINE_MINIMAL) {
+                    if (!type.isNoneHiddenOrMinimized() && type != PlayerType.INLINE_MINIMAL) {
                         Utils.runOnMainThreadNowOrLater(NavigationBarPatch::showNavigationBarHiddenOnScroll);
                     }
                 });
@@ -438,12 +481,12 @@ public final class NavigationBarPatch {
     }
 
     /**
-     * Only the lists of the pages behind or above the navigation bar hide it, not the lists of the player,
-     * the Shorts, the miniplayer pages or other windows, and not the navigation rail along the side.
+     * Only the lists of the pages behind or above the navigation bar hide it, also while the miniplayer is shown,
+     * not the lists of the player, the Shorts or other windows, and not the navigation rail along the side.
      */
     private static boolean canHideNavigationBarOnScroll(View list, View container) {
         PlayerType playerType = PlayerType.getCurrent();
-        if ((!playerType.isNoneOrHidden() && playerType != PlayerType.INLINE_MINIMAL) || ShortsPlayerState.isOpen()) {
+        if ((!playerType.isNoneHiddenOrMinimized() && playerType != PlayerType.INLINE_MINIMAL) || ShortsPlayerState.isOpen()) {
             return false;
         }
         if (!container.isShown() || !list.isShown() || list.getRootView() != container.getRootView()
@@ -459,8 +502,10 @@ public final class NavigationBarPatch {
     }
 
     /**
-     * The navigation bar slides out of the screen, and is then removed from the layout so the page fills
-     * the room it leaves, as the app does when it hides the bar. It is added back before it slides in.
+     * The navigation bar slides out of the screen, and is then removed from the layout, as the app does
+     * when it hides the bar. It is added back before it slides in.
+     * The page fills the room of the bar while the bar slides over it, so the room is removed before the bar
+     * slides out, and added back after the bar has slid in. Otherwise, the empty room shows behind the sliding bar.
      */
     private static void animateNavigationBarOnScroll(View container, View list, boolean hide) {
         navigationBarHiddenOnScroll = hide;
@@ -468,9 +513,11 @@ public final class NavigationBarPatch {
         if (running != null) {
             running.cancel();
         }
+        setBottomUiNavigationBarHeight();
 
-        if (!hide) {
-            restorePageRoom();
+        if (hide) {
+            removePageRoom(list, container);
+        } else {
             if (container.getVisibility() == View.GONE) {
                 container.setTranslationY(container.getHeight());
             }
@@ -479,24 +526,24 @@ public final class NavigationBarPatch {
         ObjectAnimator animator = ObjectAnimator.ofFloat(container, View.TRANSLATION_Y,
                 hide ? container.getHeight() : 0);
         animator.setDuration(NAVIGATION_BAR_SCROLL_ANIMATION_MILLISECONDS);
-        if (hide) {
-            animator.addListener(new AnimatorListenerAdapter() {
-                private boolean cancelled;
+        animator.addListener(new AnimatorListenerAdapter() {
+            private boolean cancelled;
 
-                @Override
-                public void onAnimationCancel(Animator animation) {
-                    cancelled = true;
-                }
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                cancelled = true;
+            }
 
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    if (!cancelled) {
-                        container.setVisibility(View.GONE);
-                        removePageRoom(list, container);
-                    }
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (cancelled) return;
+                if (hide) {
+                    container.setVisibility(View.GONE);
+                } else {
+                    restorePageRoom();
                 }
-            });
-        }
+            }
+        });
         navigationBarScrollAnimator = animator;
         animator.start();
     }
@@ -515,6 +562,7 @@ public final class NavigationBarPatch {
                 running.cancel();
             }
             restorePageRoom();
+            setBottomUiNavigationBarHeight();
             View container = bottomBarContainerRef.get();
             if (container != null) {
                 container.setTranslationY(0);
@@ -526,11 +574,29 @@ public final class NavigationBarPatch {
     }
 
     /**
+     * Sets again the height of the navigation bar the app last set, which is none while the bar is hidden on scroll.
+     */
+    private static void setBottomUiNavigationBarHeight() {
+        Enum<?> view = bottomUiNavigationBar;
+        if (view == null) return;
+
+        for (Map.Entry<BottomUiHeightsAccess, Integer> entry : new ArrayList<>(bottomUiNavigationBarHeights.entrySet())) {
+            BottomUiHeightsAccess heights = entry.getKey();
+            if (heights != null) {
+                heights.patch_setBottomUiHeight(view, entry.getValue());
+            }
+        }
+    }
+
+    /**
      * The pages that are not laid out behind the navigation bar keep the room for it below them,
      * which the app removes only when it hides the bar itself. The room of the bar is removed from the
-     * container of the pages of the scrolled list, so the page fills the room the hidden bar leaves.
+     * container of the pages of the scrolled list, so the page fills the room the bar leaves while it slides out.
      */
     private static void removePageRoom(View list, View container) {
+        // The room is still removed if the bar was hidden again before it had slid in.
+        if (pageRoomViewRef.get() != null) return;
+
         for (View view = list; view != null; view = view.getParent() instanceof View parent ? parent : null) {
             if (view.getId() != paneFragmentContainerId) continue;
 
@@ -573,6 +639,10 @@ public final class NavigationBarPatch {
      * Injection point.
      */
     public static void hideNavigationBar(View view) {
+        // The navigation bar of a recreated activity is shown.
+        if (bottomBarContainerRef.get() != view) {
+            showNavigationBarHiddenOnScroll();
+        }
         bottomBarContainerRef = new WeakReference<>(view);
         Utils.hideViewUnderCondition(HIDE_NAVIGATION_BAR, view);
     }
@@ -770,6 +840,35 @@ public final class NavigationBarPatch {
             return false;
         }
         return original;
+    }
+
+    /**
+     * The container of the scroll to bottom button of the live chat.
+     */
+    private static final int liveChatScrollButtonContainerId = NAVIGATION_BAR_STYLE != NavigationBarStyle.DEFAULT
+            ? ResourceUtils.getIdentifier(ResourceType.ID, "more_comments_icon_container")
+            : 0;
+
+    /**
+     * Injection point.
+     * <p>
+     * The live chat hides its scroll to bottom button by moving it below its container, where the bottom
+     * of the chat cuts it off. With the navigation bar covering the system navigation buttons, the chat
+     * keeps the room for the system navigation buttons below the container, so half of the hidden button
+     * is still shown there (<a href="https://github.com/MorpheApp/morphe-patches/issues/5100">...</a>).
+     * The container cuts the button off at its own bounds instead.
+     */
+    public static void clipLiveChatScrollButton(@Nullable View button) {
+        try {
+            if (translucentNavigationBarForced && button != null
+                    && button.getParent() instanceof View container
+                    && container.getId() == liveChatScrollButtonContainerId) {
+                container.setOutlineProvider(ViewOutlineProvider.BOUNDS);
+                container.setClipToOutline(true);
+            }
+        } catch (Exception ex) {
+            Logger.printException(() -> "clipLiveChatScrollButton failure", ex);
+        }
     }
 
     /**
@@ -1205,92 +1304,169 @@ public final class NavigationBarPatch {
 
     private static volatile WeakReference<View> settingsTabRef = new WeakReference<>(null);
 
-    /**
-     * If a touch of the navigation bar started on the Settings button and has not ended.
-     * Always accessed from the main thread.
-     */
-    private static boolean settingsTabTouched;
+    // 'You' button account switcher
+    private static final boolean YOU_BUTTON_ACCOUNT_SWITCHER = VersionCheckPatch.IS_21_30_OR_GREATER
+            && Settings.YOU_BUTTON_ACCOUNT_SWITCHER.get();
+
+    private static final String SENDER_VIEW_KEY = "com.google.android.libraries.youtube.rendering.elements.sender_view";
+
+    private static volatile WeakReference<View> youTabRef = new WeakReference<>(null);
 
     /**
-     * If the touch of the Settings button is a long press, so the tap it ends with does not click.
+     * The button with a long press that a touch of the navigation bar started on,
+     * if the touch has not ended. Always accessed from the main thread.
+     */
+    private static WeakReference<View> touchedTabRef = new WeakReference<>(null);
+
+    /**
+     * If the touch of the button is a long press, so the tap it ends with does not click.
      * Always accessed from the main thread.
      */
-    private static boolean settingsTabLongPressed;
+    private static boolean tabLongPressed;
 
-    private static float settingsTabTouchX;
-    private static float settingsTabTouchY;
+    private static float tabTouchX;
+    private static float tabTouchY;
 
     @Nullable
-    private static Handler settingsTabHandler;
+    private static Handler tabLongPressHandler;
 
-    private static final Runnable settingsTabLongPress = () -> {
-        View tab = settingsTabRef.get();
+    private static final Runnable tabLongPress = () -> {
+        View tab = touchedTabRef.get();
         // The long press of the navigation bar can already be called, if its feature flag is on.
-        if (tab != null && settingsTabTouched && !settingsTabLongPressed && tab.isShown()) {
+        if (tab != null && !tabLongPressed && tab.isShown()) {
             tab.performLongClick();
         }
     };
+
+    /**
+     * The long press of the navigation bar and of the button itself can both be called for the
+     * same touch.
+     *
+     * @return If the long press is the first one of the touch.
+     */
+    private static boolean isNewTabLongPress() {
+        if (touchedTabRef.get() == null) {
+            // Not from a touch, such as from accessibility services.
+            return true;
+        }
+        if (tabLongPressed) return false;
+        tabLongPressed = true;
+        return true;
+    }
+
+    /**
+     * Must be called from the main thread.
+     */
+    private static void setTabLongPressAction(View tab, View.OnClickListener action) {
+        tab.setOnLongClickListener(v -> {
+            if (isNewTabLongPress()) {
+                action.onClick(v);
+            }
+            return true;
+        });
+    }
+
+    /**
+     * Runs the command of the account button of the 'You' tab. When signed in it opens the
+     * account switcher, and when incognito it opens the incognito sheet.
+     */
+    private static void openAccountSwitcher(View view) {
+        try {
+            byte[] command = NavigationEndpoint.newBuilder()
+                    .setSignInEndpoint(SignInEndpoint.newBuilder().setUseAccountSwitcher(true))
+                    .build()
+                    .toByteArray();
+            Map<String, Object> context = new HashMap<>();
+            // The app runs the command of the account button with the button as its sender.
+            context.put(SENDER_VIEW_KEY, view);
+            if (!CommandRouterPatch.executeCommand(command, context)) {
+                Logger.printDebug(() -> "Could not open the account switcher, no activity is shown");
+            }
+        } catch (Exception ex) {
+            Logger.printException(() -> "openAccountSwitcher failure", ex);
+        }
+    }
+
+    @Nullable
+    private static View getLongPressTab(MotionEvent event) {
+        if (SHOW_SETTINGS_BUTTON) {
+            View tab = settingsTabRef.get();
+            if (tab != null && isTouchInView(event, tab)) return tab;
+        }
+        if (YOU_BUTTON_ACCOUNT_SWITCHER) {
+            View tab = youTabRef.get();
+            if (tab != null && isTouchInView(event, tab)) return tab;
+        }
+        return null;
+    }
 
     /**
      * Injection point.
      * <p>
      * The navigation bar handles the touches of its buttons itself, with a gesture detector, so the buttons
      * do not get the touches and their own long press is never called. The gesture detector has long presses
-     * turned off with a feature flag, and then a long press ends as a tap. The long press of the Settings button
-     * is found here instead, and the tap it ends with is ignored by the button.
+     * turned off with a feature flag, and then a long press ends as a tap. The long press of the buttons
+     * is found here instead, and the touch that ends it is changed to a cancel, so the button is not tapped.
+     *
+     * @return The touch the navigation bar handles.
      */
-    public static void navigationBarTouched(MotionEvent event) {
-        if (!SHOW_SETTINGS_BUTTON) return;
+    public static MotionEvent navigationBarTouched(MotionEvent event) {
+        if (!SHOW_SETTINGS_BUTTON && !YOU_BUTTON_ACCOUNT_SWITCHER) return event;
 
         try {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN -> {
-                    cancelSettingsTabLongPress();
-                    settingsTabLongPressed = false;
-                    View tab = settingsTabRef.get();
-                    settingsTabTouched = tab != null && isTouchInView(event, tab);
-                    if (settingsTabTouched) {
-                        settingsTabTouchX = event.getRawX();
-                        settingsTabTouchY = event.getRawY();
-                        if (settingsTabHandler == null) {
-                            settingsTabHandler = new Handler(Looper.getMainLooper());
+                    cancelTabLongPress();
+                    tabLongPressed = false;
+                    View tab = getLongPressTab(event);
+                    touchedTabRef = new WeakReference<>(tab);
+                    if (tab != null) {
+                        tabTouchX = event.getRawX();
+                        tabTouchY = event.getRawY();
+                        if (tabLongPressHandler == null) {
+                            tabLongPressHandler = new Handler(Looper.getMainLooper());
                         }
-                        settingsTabHandler.postDelayed(settingsTabLongPress, ViewConfiguration.getLongPressTimeout());
+                        tabLongPressHandler.postDelayed(tabLongPress, ViewConfiguration.getLongPressTimeout());
                     }
                 }
                 case MotionEvent.ACTION_MOVE -> {
-                    View tab = settingsTabRef.get();
-                    if (settingsTabTouched && tab != null) {
+                    View tab = touchedTabRef.get();
+                    if (tab != null) {
                         final int touchSlop = ViewConfiguration.get(tab.getContext()).getScaledTouchSlop();
-                        if (Math.abs(event.getRawX() - settingsTabTouchX) > touchSlop
-                                || Math.abs(event.getRawY() - settingsTabTouchY) > touchSlop) {
-                            cancelSettingsTabLongPress();
+                        if (Math.abs(event.getRawX() - tabTouchX) > touchSlop
+                                || Math.abs(event.getRawY() - tabTouchY) > touchSlop) {
+                            cancelTabLongPress();
                         }
                     }
                 }
-                case MotionEvent.ACTION_POINTER_DOWN -> cancelSettingsTabLongPress();
+                case MotionEvent.ACTION_POINTER_DOWN -> cancelTabLongPress();
                 case MotionEvent.ACTION_UP -> {
-                    cancelSettingsTabLongPress();
-                    settingsTabTouched = false;
-                    // The navigation bar clicks the button right after, while handling the same touch.
-                    if (settingsTabLongPressed && settingsTabHandler != null) {
-                        settingsTabHandler.post(() -> settingsTabLongPressed = false);
+                    cancelTabLongPress();
+                    touchedTabRef = new WeakReference<>(null);
+                    if (tabLongPressed) {
+                        tabLongPressed = false;
+                        // The original touch is still used by the views that dispatch it.
+                        MotionEvent cancel = MotionEvent.obtain(event);
+                        cancel.setAction(MotionEvent.ACTION_CANCEL);
+                        return cancel;
                     }
                 }
                 case MotionEvent.ACTION_CANCEL -> {
-                    cancelSettingsTabLongPress();
-                    settingsTabTouched = false;
-                    settingsTabLongPressed = false;
+                    cancelTabLongPress();
+                    touchedTabRef = new WeakReference<>(null);
+                    tabLongPressed = false;
                 }
             }
         } catch (Exception ex) {
             Logger.printException(() -> "navigationBarTouched failure", ex);
         }
+
+        return event;
     }
 
-    private static void cancelSettingsTabLongPress() {
-        if (settingsTabHandler != null) {
-            settingsTabHandler.removeCallbacks(settingsTabLongPress);
+    private static void cancelTabLongPress() {
+        if (tabLongPressHandler != null) {
+            tabLongPressHandler.removeCallbacks(tabLongPress);
         }
     }
 
@@ -2120,7 +2296,7 @@ public final class NavigationBarPatch {
 
                         // Replace the accessibility label of the copied button.
                         ButtonRendererAccessibilityData accessibilityData = ButtonRendererAccessibilityData
-                                .newBuilder().setLabel(str("morphe_settings_submenu_title")).build();
+                                .newBuilder().setLabel(str("settings")).build();
                         renderer.setButtonRendererAccessibilityData(accessibilityData);
                         renderer.setRendererAccessibilityData(RendererAccessibilityData.newBuilder()
                                 .setButtonRendererAccessibilityData(accessibilityData).build());

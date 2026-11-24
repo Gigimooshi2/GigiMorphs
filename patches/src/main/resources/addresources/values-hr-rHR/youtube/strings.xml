@@ -61,7 +61,10 @@ Promjene uključuju:
   <string name="morphe_hide_account_menu_title">Uključi Knjižnicu / Filter donjeg izbornika</string>
   <string name="morphe_hide_account_menu_filter_strings_title">Knjiga / Filter donjeg izbornika</string>
   <string name="morphe_hide_account_menu_filter_strings_summary">Unesite nazive izbornika Knjižnice / Donjeg izbornika za filtriranje, odvojene novim redcima</string>
+  <string name="morphe_hide_account_menu_badges_title">Sakrij oznake</string>
   <string name="morphe_hide_account_menu_downloads_title">Sakrij preuzimanja</string>
+  <string name="morphe_hide_account_menu_liked_videos_title">Sakrij \"Sviđaju mi se videozapisi\"</string>
+  <string name="morphe_hide_account_menu_watch_later_title">Sakrij \"Gledaj kasnije\"</string>
   <string name="morphe_hide_album_cards_title">Sakrij kartice albuma</string>
   <string name="morphe_hide_album_cards_summary">Skriva kartice albuma ispod opisa izvođača</string>
   <string name="morphe_hide_artist_cards_title">Sakrij kartice izvođača</string>
@@ -420,6 +423,7 @@ Ograničenja:
   <string name="morphe_hide_comments_live_chat_tooltips_summary">Skriva iskačuće savjete prikazane blizu trake za unos chata, kao što je obavijest o chatu samo za pretplatnike</string>
   <string name="morphe_hide_comments_menu_button_title">Sakrij gumb izbornika</string>
   <string name="morphe_hide_comments_menu_button_summary">Sakriva gumb izbornika s tri točke svakog komentara</string>
+  <string name="morphe_hide_comments_none_yet_title">Sakrij predpregled \"Još nema komentara\"</string>
   <string name="morphe_hide_comments_preview_comment_title">Sakrij pregled komentara</string>
   <string name="morphe_hide_comments_preview_comment_summary">Sakriva pregled komentara ispod videa prije otvaranja cijelog odjeljka s komentarima</string>
   <string name="morphe_hide_comments_preview_comment_hidden">Komentar skriven od strane Morphe…</string>
@@ -427,8 +431,10 @@ Ograničenja:
   <string name="morphe_minimal_comments_button_summary">Sakriva klizne kartice i njihov birač stranica koji su prikazani na gumbu komentara</string>
   <string name="morphe_hide_comments_timestamp_button_title">Sakrij gumb Vremenske oznake</string>
   <string name="morphe_hide_comments_top_fans_button_title">Sakrij tipku \'Najveći obožavatelji\'</string>
+  <string name="morphe_hide_comments_topics_title">Sakrij \"Teme\"</string>
+  <string name="morphe_hide_comments_topics_summary">Sakriva opciju trake za filtriranje \"Teme\" i prekratke pregledne komentare s \"Temom\" ispod videa</string>
   <string name="morphe_hide_comments_translate_button_title">Sakrij gumb Prevedi</string>
-  <string name="morphe_hide_comments_zero_state_title">Sakrij poruku \'Još nema komentara\'</string>
+  <string name="morphe_hide_comments_visit_the_community_section_title">Sakrij odjeljak \"Posjetite zajednicu\"</string>
   <string name="morphe_sanitize_comments_highlighted_search_links_title">Očisti istaknute poveznice za pretraživanje</string>
   <string name="morphe_sanitize_comments_highlighted_search_links_summary">Čisti istaknute poveznice za pretraživanje, ostavljajući samo originalni obični tekst</string>
   <!-- layout.hide.player.flyoutmenupanel.hidePlayerFlyoutMenuPatch -->
@@ -556,6 +562,8 @@ Da biste prikazali izbornik audio zapisa, promijenite 'Parodija video streamova'
   <string name="morphe_channel_whitelist_channel_added">Kanal je dodan na popis dopuštenih</string>
   <string name="morphe_channel_whitelist_channel_removed">Kanal je uklonjen s popisa dopuštenih</string>
   <!-- interaction.doubletap.doubleTapLengthPatch -->
+  <!-- Search dialog of comments search, channel search and playlist search. -->
+  <string name="morphe_search_dialog_search">Traži</string>
   <!-- interaction.channelsearch.channelSearchPatch -->
   <string name="morphe_channel_search_title">Pretraži unutar kanala</string>
   <string name="morphe_channel_search_summary">Dodaje drugi gumb za pretraživanje na stranicama kanala kako biste pretraživali samo taj kanal</string>
@@ -573,6 +581,13 @@ Da biste prikazali izbornik audio zapisa, promijenite 'Parodija video streamova'
   <string name="morphe_channel_search_sort_oldest">Najstariji</string>
   <string name="morphe_channel_search_sort_shortest">Najkraći</string>
   <string name="morphe_channel_search_sort_longest">Najduži</string>
+  <!-- interaction.playlistsearch.playlistSearchPatch -->
+  <string name="morphe_playlist_search_title">Pretraživanje unutar popisa za reprodukciju</string>
+  <string name="morphe_playlist_search_summary">Dodaje drugu gumbu za pretraživanje na stranicama popisa za reprodukciju za pretraživanje samo tog popisa</string>
+  <string name="morphe_playlist_search_hint">Pretraži popis za reprodukciju</string>
+  <string name="morphe_playlist_search_results">Rezultati pretraživanja popisa za reprodukciju</string>
+  <string name="morphe_playlist_search_no_results">U ovom popisu za reprodukciju ništa nije pronađeno</string>
+  <string name="morphe_playlist_search_failed">Pretraživanje ovog popisa za reprodukciju nije uspjelo</string>
   <!-- interaction.copyvideolink.copyVideoLinkButtonPatch -->
   <string name="morphe_share_copy_link_button_success">Poveznica kopirana u međuspremnik</string>
   <string name="morphe_share_copy_link_with_timestamp_button_success">Poveznica s vremenskim žigom kopirana u međuspremnik</string>
@@ -647,6 +662,15 @@ Nakon što se jednom otvori video s gumbom Ask, funkcija radi sa svim videima, �
   <!-- layout.feedviews.feedViewCountPatch -->
   <string name="morphe_feed_view_count_title">Prikaži broj pregleda na sličicama</string>
   <string name="morphe_feed_view_count_summary">Broj pregleda videozapisa u feedu prikazuje se u donjem lijevom kutu sličice umjesto ispod naslova. Kod nekih videozapisa, kao što su oni na policama, broj pregleda možda neće biti prikazan</string>
+  <!-- layout.returnyoutubeusername.returnYouTubeUsernamePatch -->
+  <string name="morphe_return_youtube_username_screen_title">Vrati YouTube korisničko ime</string>
+  <string name="morphe_return_youtube_username_screen_summary">Prikaži nazive kanala umjesto handleova</string>
+  <string name="morphe_return_youtube_username_title">Prikaži nazive kanala</string>
+  <string name="morphe_return_youtube_username_summary">Nazivi kanala prikazuju se umjesto handleova u komentarima, ispod naslova videa i u Shorts videima</string>
+  <string name="morphe_return_youtube_username_display_format_title">Format naziva kanala</string>
+  <string name="morphe_return_youtube_username_display_format_entry_1">Naziv kanala</string>
+  <string name="morphe_return_youtube_username_display_format_entry_2">Naziv kanala (@handle)</string>
+  <string name="morphe_return_youtube_username_display_format_entry_3">\@handle (Naziv kanala)</string>
   <!-- layout.returnyoutubedislike.returnYouTubeDislikePatch -->
   <string name="morphe_ryd_feed_like_count_title">Prikaži broj lajkova na minijaturi feeda</string>
   <string name="morphe_ryd_feed_like_ratio_title">Prikaži omjer lajkova na minijaturi feeda</string>
@@ -659,7 +683,6 @@ Nakon što se jednom otvori video s gumbom Ask, funkcija radi sa svim videima, �
   <string name="morphe_search_comments_summary">Dodirnite gumb za pretraživanje u komentarima kako biste prikazali samo učitane komentare koji sadrže sve pretražene riječi. Riječi stavite pod navodnike kako biste pretražili frazu</string>
   <string name="morphe_search_comments_dialog_title">Pretraži komentare</string>
   <string name="morphe_search_comments_hint">Riječi za pretraživanje</string>
-  <string name="morphe_search_comments_search">Traži</string>
   <string name="morphe_search_comments_clear">Izbriši</string>
   <string name="morphe_search_comments_applied">Promijenite redoslijed sortiranja ili ponovno otvorite komentare kako biste ih pretražili</string>
   <string name="morphe_search_comments_cleared">Pretraživanje je obrisano. Promijenite redoslijed sortiranja ili ponovno otvorite komentare kako biste prikazali sve komentare</string>
@@ -793,6 +816,7 @@ Vaš API ključ nikada ne smijete dijeliti. Bilo tko s pristupom njemu može kor
   <string name="morphe_loop_count_clear_done">Spremljeni brojevi ponavljanja su obrisani</string>
   <string name="morphe_loop_count_flyout_name">Broj ponavljanja</string>
   <string name="morphe_loop_count_dialog_message">Koliko puta će se video reproducirati prije sljedećeg videa, od %1$s do %2$s. Ostavite prazno za ponavljanje videa bez ograničenja.</string>
+  <string name="morphe_loop_count_times">%s puta</string>
   <string name="morphe_loop_count_no_limit">Bez ograničenja</string>
   <string name="morphe_loop_count_decrease">Manje puta</string>
   <string name="morphe_loop_count_increase">Više puta</string>
@@ -832,6 +856,8 @@ Info: Možda neće raditi na prijenosima uživo"</string>
   <string name="morphe_play_all_button_type_entry_10">Videozapisi samo za članove</string>
   <string name="morphe_play_all_button_type_entry_11">Shorts za članove</string>
   <string name="morphe_play_all_button_type_entry_12">Isključivo za članove - prijenosi uživo</string>
+  <string name="morphe_play_all_button_reverse_title">Obrnuti redoslijed</string>
+  <string name="morphe_play_all_button_reverse_summary">Generirani popis za reprodukciju automatski se reproducira od posljednjeg do prvog videozapisa</string>
   <string name="morphe_play_all_button_not_available_toast">Nije moguće generirati listu reprodukcije zbog neslaganja ID-a kanala</string>
   <!-- interaction.playlistpanel.playlistPanelButtonPatch -->
   <string name="morphe_playlist_panel_button_title">Prikaži tipku Playlista</string>
@@ -1028,6 +1054,56 @@ Da biste to popravili, uključite \"Lažiranje video streamova\" i promijenite \
   <string name="morphe_swipe_overlay_style_entry_7">Vertikalno preklapanje (minimalno)</string>
   <string name="morphe_swipe_change_video_title">Omogući prevlačenje za promjenu videa</string>
   <string name="morphe_swipe_change_video_summary">Povucite u načinu pune veličine za preskakanje na sljedeći ili prethodni videozapise</string>
+  <!-- interaction.holdgesture.holdGesturePatch -->
+  <string name="morphe_hold_gesture_screen_title">Gesta držanja</string>
+  <string name="morphe_hold_gesture_screen_summary">Promijenite i zaključajte brzinu reprodukcije te pokrenite radnje povlačenjem nakon dodira i držanja</string>
+  <string name="morphe_hold_gesture_title">Omogući gestu držanja</string>
+  <string name="morphe_hold_gesture_summary">Dodir i držanje videozapisa mogu biti praćeni povlačenjem. Brzina tijekom držanja je brzina reprodukcije pri dodiru i držanju</string>
+  <string name="morphe_hold_gesture_press_to_swipe_summary">Ne koristi se dok je uključeno „Pritisni za prevlačenje”. Dodirni za promjenu</string>
+  <string name="morphe_hold_gesture_press_to_swipe_dialog_title">Pritisni za prevlačenje je uključeno</string>
+  <string name="morphe_hold_gesture_press_to_swipe_dialog_message">Gesta držanja i gesta pritisni za prevlačenje kontrola prevlačenja započinju dodirivanjem i držanjem, stoga može biti uključena samo jedna od njih.</string>
+  <string name="morphe_hold_gesture_press_to_swipe_dialog_turn_off">Isključi pritisni za prevlačenje</string>
+  <string name="morphe_hold_gesture_press_to_swipe_toast">Gesta držanja se ne koristi dok je uključeno „Pritisni za prevlačenje”</string>
+  <string name="morphe_hold_gesture_dialog_title">Gesta držanja je uključena</string>
+  <string name="morphe_hold_gesture_dialog_turn_off">Isključi gestu držanja</string>
+  <string name="morphe_hold_gesture_haptic_feedback_title">Omogući haptičke povratne informacije</string>
+  <string name="morphe_hold_gesture_haptic_feedback_summary">Vibrira kada se brzina promijeni i kada je brzina zaključana</string>
+  <string name="morphe_hold_gesture_speed_swipe_title">Povucite u stranu kako biste promijenili brzinu</string>
+  <string name="morphe_hold_gesture_speed_swipe_summary">Nakon dodira i držanja, povucite lijevo za sporije i desno za brže reproduciranje. Što više povučete, brzina se nastavlja mijenjati dok prst ne bude vraćen</string>
+  <string name="morphe_hold_gesture_speed_step_title">Korak brzine</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_title">Osjetljivost povlačenja</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_entry_1">Niska</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_entry_2">Normalna</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_entry_3">Visoka</string>
+  <string name="morphe_hold_gesture_speed_min_title">Najsporija brzina</string>
+  <string name="morphe_hold_gesture_speed_min_summary">Najsporija brzina koju povlačenje može dosegnuti</string>
+  <string name="morphe_hold_gesture_speed_max_title">Najbrža brzina</string>
+  <string name="morphe_hold_gesture_speed_max_summary">Najbrža brzina koju povlačenje može dosegnuti (do 8)</string>
+  <string name="morphe_hold_gesture_lock_title">Povucite prema dolje za zaključavanje brzine</string>
+  <string name="morphe_hold_gesture_lock_summary">Nakon dodira i držanja, povucite prema dolje kako biste zadržali brzinu kada podignete prst. Dodirnite oznaku ili ponovno dodirnite i držite za otključavanje</string>
+  <string name="morphe_hold_gesture_lock_badge_always_title">Uvijek prikaži oznaku zaključavanja</string>
+  <string name="morphe_hold_gesture_lock_badge_always_summary">Prikazuje oznaku zaključane brzine čak i kada kontrole playera nisu vidljive. Ako je isključeno, oznaka se prikazuje zajedno s kontrolama playera</string>
+  <string name="morphe_hold_gesture_unlock_on_video_change_title">Otključaj kada se video promijeni</string>
+  <string name="morphe_hold_gesture_unlock_on_video_change_summary">Zaključana brzina završava kada započne drugi video</string>
+  <string name="morphe_hold_gesture_lock_hint">Povucite prema dolje za zaključavanje</string>
+  <string name="morphe_hold_gesture_lock_release">Otpustite za zaključavanje %s</string>
+  <string name="morphe_hold_gesture_launcher_title">Povucite prema gore za otvaranje pokretača</string>
+  <string name="morphe_hold_gesture_launcher_summary">Nakon dodirivanja i držanja, povucite prst prema gore kako biste prikazali radnje oko prsta. Podignite prst s radnje kako biste je pokrenuli</string>
+  <string name="morphe_hold_gesture_launcher_slot_count_title">Broj radnji</string>
+  <string name="morphe_hold_gesture_launcher_slot_1_title">Radnja 1</string>
+  <string name="morphe_hold_gesture_launcher_slot_2_title">Radnja 2</string>
+  <string name="morphe_hold_gesture_launcher_slot_3_title">Radnja 3</string>
+  <string name="morphe_hold_gesture_launcher_slot_4_title">Radnja 4</string>
+  <string name="morphe_hold_gesture_launcher_slot_5_title">Radnja 5</string>
+  <string name="morphe_hold_gesture_launcher_action_screen_lock">Zaključaj zaslon</string>
+  <string name="morphe_hold_gesture_launcher_action_loop">Ponavljanje videa</string>
+  <string name="morphe_hold_gesture_launcher_action_loop_off">Zaustavi ponavljanje</string>
+  <string name="morphe_hold_gesture_launcher_action_screenshot">Spremi kadar</string>
+  <string name="morphe_hold_gesture_launcher_action_watch_later">Spremi za kasnije gledanje</string>
+  <string name="morphe_hold_gesture_launcher_action_timestamp_url">Kopiraj poveznicu na trenutnom vremenu</string>
+  <string name="morphe_hold_gesture_screen_unlock">Dodirnite za otključavanje</string>
+  <string name="morphe_hold_gesture_frame_saved">Kadar je spremljen na %s</string>
+  <string name="morphe_hold_gesture_frame_failed">Kadar nije mogao biti spremljen</string>
   <!-- layout.captions.captionsPatch -->
   <string name="morphe_captions_screen_title">Podnaslovi</string>
   <string name="morphe_captions_screen_summary">Upravljanje automatskim titlovima i kolačićima za titlove</string>
@@ -1215,6 +1291,9 @@ Postavke → Reprodukcija (ili Automatsko reproduciranje) → Automatski reprodu
   <!-- layout.playlistautoplay.disablePlaylistAutoplayPatch -->
   <string name="morphe_disable_playlist_autoplay_title">Onemogući automatsku reprodukciju popisa za reprodukciju</string>
   <string name="morphe_disable_playlist_autoplay_summary">Sprječava automatsko prebacivanje na sljedeći videozapis u popisima za reprodukciju</string>
+  <!-- layout.playlistautoplay.reversePlaylistAutoplayPatch -->
+  <string name="morphe_reverse_playlist_autoplay_title">Obrni automatsku reprodukciju popisa za reprodukciju</string>
+  <string name="morphe_reverse_playlist_autoplay_summary">Popisi za reprodukciju automatski se reproduciraju od posljednjeg do prvog videozapisa. Miksevi nisu obrnuti</string>
   <!-- interaction.autoplay.autoplayControlPatch -->
   <string name="morphe_autoplay_control_title">Upravljanje automatskim reproduciranjem</string>
   <string name="morphe_autoplay_control_summary">Dodaje gumb za reprodukciju i pravilo za sljedeći videozapis. Playliste i redovi za reprodukciju se nastavljaju, Mix se zaustavlja nakon određenog broja videozapisa, a sugerirani videozapisi se nikada ne reproduciraju. Dodirnite gumb za sljedeći način rada, dodirnite i držite za popis</string>
@@ -1262,6 +1341,21 @@ Postavke → Reprodukcija (ili Automatsko reproduciranje) → Automatski reprodu
   <string name="morphe_fullscreen_video_scale_button_summary">Dodirnite za cikliranje: Zadano, Rastegni, Povećaj</string>
   <string name="morphe_fullscreen_video_scale_button_fullscreen_only_title">Prikaži samo na cijelom zaslonu</string>
   <string name="morphe_fullscreen_video_scale_button_fullscreen_only_summary">Sakrij gumb za skaliranje videa u portretnom playeru</string>
+  <!-- video.speed.replay.replayVideoPatch -->
+  <string name="morphe_replay_video_button_title">Prikaži tipku Sporije reproduciraj</string>
+  <string name="morphe_replay_video_button_summary">Vraća video unatrag i privremeno ga usporava. Dodirnite ponovno za otkazivanje</string>
+  <string name="morphe_replay_video_swipe_title">Prevucite ulijevo za sporije reproduciranje</string>
+  <string name="morphe_replay_video_swipe_summary">Prevucite ulijevo po videu za vraćanje od 1 do 10 sekundi, ovisno o duljini prevlačenja. Upravljanje prevlačenjem pretražuje, a prevlačenja u gornjoj zoni imaju prednost</string>
+  <string name="morphe_replay_video_swipe_preview">Reproduciraj ponovno %s s</string>
+  <string name="morphe_replay_video_seconds_title">Trajanje prematanja unatrag</string>
+  <string name="morphe_replay_video_seconds_summary">Koliko sekundi gumb premata video unatrag</string>
+  <string name="morphe_replay_video_slow_seconds_title">Trajanje sporog reproduciranja</string>
+  <string name="morphe_replay_video_slow_seconds_summary">Koliko sekundi videa reproducira brzinom ponovnice nakon prematanja</string>
+  <string name="morphe_replay_video_speed_title">Brzina ponovnice</string>
+  <string name="morphe_replay_video_speed_summary">Brzina reproduciranja ponovnice, npr. 0.5. Ponovnica nikada nije brža od trenutne brzine</string>
+  <string name="morphe_replay_video_start">Sporija ponovnica</string>
+  <string name="morphe_replay_video_unavailable">Sporo reproduciranje nije dostupno za ovaj video</string>
+  <string name="morphe_replay_video_speed_invalid">Nevaljana brzina ponovnice, vraćanje na zadane postavke</string>
   <!-- layout.player.buttons.muteVideoButtonPatch -->
   <string name="morphe_mute_video_button_title">Pokaži tipku za isključivanje zvuka</string>
   <!-- layout.player.overlay.customPlayerOverlayOpacityPatch -->
@@ -1608,6 +1702,8 @@ Videozapisi se zahtijevaju kratkim prefiksom hashiranog ID-a videozapisa, pa pos
   <string name="morphe_video_delay_button_overlay_summary">Dodirnite i držite za resetiranje kašnjenja na 0 ms</string>
   <string name="morphe_video_delay_button_flyout_title">Prikaži izbornik Kašnjenje videa</string>
   <string name="morphe_video_delay_dialog_input_hint">Kašnjenje u milisekundama</string>
+  <!-- video.effects.videoEffectsPatch -->
+  <string name="morphe_video_effect_button_flyout_title">Prikaži izbornik za videoefekte</string>
   <!-- video.quality.rememberVideoQualityPatch -->
   <string name="morphe_remember_shorts_quality_last_selected_title">Zapamti kvalitetu Shorts videozapisa</string>
   <string name="morphe_remember_shorts_quality_last_selected_summary">Primjenjuje vaš ručni odabir kvalitete na sve buduće Shorts videozapise</string>
@@ -1696,10 +1792,6 @@ AVC (H.264)
   <string name="morphe_advanced_video_quality_menu_summary">Preskače izbornik odabira kvalitete i izravno otvara napredni izbornik kvalitete</string>
   <!-- video.quality.hidePremiumVideoQualityPatch -->
   <string name="morphe_hide_premium_video_quality_title">Sakrij opcije za premium kvalitetu</string>
-  <!-- video.quality.prioritizeVideoQualityPatch -->
-  <string name="morphe_video_quality_prioritize_title">Daj prednost kvaliteti videozapisa</string>
-  <string name="morphe_video_quality_prioritize_summary">Daje prednost najvišoj dostupnoj kvaliteti videozapisa nad učinkovitošću kodeka</string>
-  <string name="morphe_video_quality_prioritize_dialog">Ako je ova postavka isključena, stariji videozapisi možda neće prikazivati opcije kvalitete videozapisa</string>
   <!-- misc.spoof.spoofVideoStreamsPatch -->
   <string name="morphe_spoof_video_streams_av1_title">Omogući \"Android VR\" / \"visionOS\" AV1</string>
   <string name="morphe_spoof_video_streams_av1_summary">Omogućuje softversko AV1 dekodiranje pri korištenju klijenta \"Android VR\" / \"visionOS\"</string>

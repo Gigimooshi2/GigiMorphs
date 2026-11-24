@@ -61,7 +61,10 @@ Second \"item\" text"</string>
   <string name="morphe_hide_account_menu_title">Включить фильтр нижнего меню \"Библиотека\" / \"Вы\"</string>
   <string name="morphe_hide_account_menu_filter_strings_title">Фильтр нижнего меню \"Библиотека\" / \"Вы\"</string>
   <string name="morphe_hide_account_menu_filter_strings_summary">Введите названия пунктов нижнего меню \"Библиотека\" / \"Вы\" для фильтрации, по одному в строке</string>
+  <string name="morphe_hide_account_menu_badges_title">Скрыть бейджи</string>
   <string name="morphe_hide_account_menu_downloads_title">Скрыть загрузки</string>
+  <string name="morphe_hide_account_menu_liked_videos_title">Скрыть \"Понравившиеся видео\"</string>
+  <string name="morphe_hide_account_menu_watch_later_title">Скрыть \"Смотреть позже\"</string>
   <string name="morphe_hide_album_cards_title">Скрыть карточки альбомов</string>
   <string name="morphe_hide_album_cards_summary">Скрывает карточки альбомов под описанием исполнителя</string>
   <string name="morphe_hide_artist_cards_title">Скрыть карточки исполнителей</string>
@@ -420,6 +423,7 @@ Second \"item\" text"</string>
   <string name="morphe_hide_comments_live_chat_tooltips_summary">Скрывает всплывающие подсказки рядом с полем ввода чата, например, уведомление о чате только для подписчиков</string>
   <string name="morphe_hide_comments_menu_button_title">Скрыть кнопку меню</string>
   <string name="morphe_hide_comments_menu_button_summary">Скрывает кнопку меню с 3 точками у каждого комментария</string>
+  <string name="morphe_hide_comments_none_yet_title">Скрыть предпросмотр \"Комментариев пока нет\"</string>
   <string name="morphe_hide_comments_preview_comment_title">Скрыть предпросмотр комментария</string>
   <string name="morphe_hide_comments_preview_comment_summary">Скрывает предварительный просмотр комментария под видео перед открытием полного раздела комментариев</string>
   <string name="morphe_hide_comments_preview_comment_hidden">Комментарий скрыт Morphe…</string>
@@ -427,8 +431,10 @@ Second \"item\" text"</string>
   <string name="morphe_minimal_comments_button_summary">Скрывает скользящие карточки и их переключатель страниц, отображаемые на кнопке комментариев</string>
   <string name="morphe_hide_comments_timestamp_button_title">Скрыть кнопку метки времени</string>
   <string name="morphe_hide_comments_top_fans_button_title">Скрыть кнопку «Лучшие фанаты»</string>
+  <string name="morphe_hide_comments_topics_title">Скрыть \"Темы\"</string>
+  <string name="morphe_hide_comments_topics_summary">Скрывает опцию \"Темы\" на панели фильтров и предпросмотр комментариев по темам под видео</string>
   <string name="morphe_hide_comments_translate_button_title">Скрыть кнопку \"Перевести\"</string>
-  <string name="morphe_hide_comments_zero_state_title">Скрыть сообщение «Нет комментариев»</string>
+  <string name="morphe_hide_comments_visit_the_community_section_title">Скрыть раздел \"Посетите сообщество\"</string>
   <string name="morphe_sanitize_comments_highlighted_search_links_title">Очистить выделенные ссылки поиска</string>
   <string name="morphe_sanitize_comments_highlighted_search_links_summary">Очищает выделенные ссылки поиска, оставляя только исходный простой текст</string>
   <!-- layout.hide.player.flyoutmenupanel.hidePlayerFlyoutMenuPatch -->
@@ -556,6 +562,8 @@ Second \"item\" text"</string>
   <string name="morphe_channel_whitelist_channel_added">Канал добавлен в список разрешенных</string>
   <string name="morphe_channel_whitelist_channel_removed">Канал удален из списка разрешенных</string>
   <!-- interaction.doubletap.doubleTapLengthPatch -->
+  <!-- Search dialog of comments search, channel search and playlist search. -->
+  <string name="morphe_search_dialog_search">Поиск</string>
   <!-- interaction.channelsearch.channelSearchPatch -->
   <string name="morphe_channel_search_title">Поиск по каналу</string>
   <string name="morphe_channel_search_summary">Добавляет вторую кнопку поиска на страницах канала для поиска только по этому каналу</string>
@@ -573,6 +581,13 @@ Second \"item\" text"</string>
   <string name="morphe_channel_search_sort_oldest">Самые старые</string>
   <string name="morphe_channel_search_sort_shortest">Самые короткие</string>
   <string name="morphe_channel_search_sort_longest">Самые длинные</string>
+  <!-- interaction.playlistsearch.playlistSearchPatch -->
+  <string name="morphe_playlist_search_title">Поиск по плейлисту</string>
+  <string name="morphe_playlist_search_summary">Добавляет вторую кнопку поиска на страницы плейлистов для поиска только по этому плейлисту</string>
+  <string name="morphe_playlist_search_hint">Поиск по плейлисту</string>
+  <string name="morphe_playlist_search_results">Результаты поиска по плейлисту</string>
+  <string name="morphe_playlist_search_no_results">В этом плейлисте ничего не найдено</string>
+  <string name="morphe_playlist_search_failed">Не удалось выполнить поиск по этому плейлисту</string>
   <!-- interaction.copyvideolink.copyVideoLinkButtonPatch -->
   <string name="morphe_share_copy_link_button_success">Ссылка скопирована в буфер обмена</string>
   <string name="morphe_share_copy_link_with_timestamp_button_success">Ссылка с отметкой времени скопирована в буфер обмена</string>
@@ -647,10 +662,19 @@ Second \"item\" text"</string>
   <!-- layout.feedviews.feedViewCountPatch -->
   <string name="morphe_feed_view_count_title">Показывать количество просмотров на миниатюрах</string>
   <string name="morphe_feed_view_count_summary">Количество просмотров видео в ленте отображается в левом нижнем углу их миниатюр, а не под заголовком. Некоторые видео, например в полках, могут не показывать количество просмотров</string>
+  <!-- layout.returnyoutubeusername.returnYouTubeUsernamePatch -->
+  <string name="morphe_return_youtube_username_screen_title">Возврат имени пользователя YouTube</string>
+  <string name="morphe_return_youtube_username_screen_summary">Показывать названия каналов вместо псевдонимов</string>
+  <string name="morphe_return_youtube_username_title">Показывать названия каналов</string>
+  <string name="morphe_return_youtube_username_summary">Названия каналов отображаются вместо псевдонимов в комментариях, под названием видео и в Shorts</string>
+  <string name="morphe_return_youtube_username_display_format_title">Формат названия канала</string>
+  <string name="morphe_return_youtube_username_display_format_entry_1">Название канала</string>
+  <string name="morphe_return_youtube_username_display_format_entry_2">Название канала (@handle)</string>
+  <string name="morphe_return_youtube_username_display_format_entry_3">\@handle (Название канала)</string>
   <!-- layout.returnyoutubedislike.returnYouTubeDislikePatch -->
-  <string name="morphe_ryd_feed_like_count_title">Показывать количество лайков под миниатюрой в ленте</string>
-  <string name="morphe_ryd_feed_like_ratio_title">Показывать процент лайков под миниатюрой в ленте</string>
-  <string name="morphe_ryd_feed_counts_position_title">Позиция лайка на миниатюре ленты</string>
+  <string name="morphe_ryd_feed_like_count_title">Показывать количество лайков у миниатюр в ленте</string>
+  <string name="morphe_ryd_feed_like_ratio_title">Показывать процент лайков у миниатюр в ленте</string>
+  <string name="morphe_ryd_feed_counts_position_title">Расположение лайков у миниатюр в ленте</string>
   <string name="morphe_ryd_feed_counts_position_entry_1">Рядом с количеством просмотров</string>
   <string name="morphe_ryd_feed_counts_position_entry_2">Справа посередине</string>
   <string name="morphe_ryd_feed_counts_position_entry_3">Слева вверху</string>
@@ -659,7 +683,6 @@ Second \"item\" text"</string>
   <string name="morphe_search_comments_summary">Нажмите кнопку поиска в комментариях, чтобы отобразить только те загруженные комментарии, которые содержат все искомые слова. Чтобы найти фразу, заключите слова в кавычки</string>
   <string name="morphe_search_comments_dialog_title">Поиск комментариев</string>
   <string name="morphe_search_comments_hint">Слова для поиска</string>
-  <string name="morphe_search_comments_search">Поиск</string>
   <string name="morphe_search_comments_clear">Очистить</string>
   <string name="morphe_search_comments_applied">Измените порядок сортировки или снова откройте комментарии, чтобы выполнить поиск по ним</string>
   <string name="morphe_search_comments_cleared">Поиск завершён. Измените порядок сортировки или снова откройте комментарии, чтобы отобразить все комментарии</string>
@@ -833,6 +856,8 @@ Second \"item\" text"</string>
   <string name="morphe_play_all_button_type_entry_10">Видео только для участников</string>
   <string name="morphe_play_all_button_type_entry_11">Short только для участников</string>
   <string name="morphe_play_all_button_type_entry_12">Прямые трансляции только для участников</string>
+  <string name="morphe_play_all_button_reverse_title">Обратный порядок</string>
+  <string name="morphe_play_all_button_reverse_summary">Созданный плейлист воспроизводится автоматически от последнего видео к первому</string>
   <string name="morphe_play_all_button_not_available_toast">Не удалось создать плейлист из-за несоответствия ID канала</string>
   <!-- interaction.playlistpanel.playlistPanelButtonPatch -->
   <string name="morphe_playlist_panel_button_title">Показать кнопку плейлиста</string>
@@ -1029,6 +1054,56 @@ Second \"item\" text"</string>
   <string name="morphe_swipe_overlay_style_entry_7">Вертикальный индикатор (минимальный)</string>
   <string name="morphe_swipe_change_video_title">Включить переключение видео жестом</string>
   <string name="morphe_swipe_change_video_summary">Свайпните в полноэкранном режиме, чтобы перескочить к следующему или предыдущему видео</string>
+  <!-- interaction.holdgesture.holdGesturePatch -->
+  <string name="morphe_hold_gesture_screen_title">Жест удержания</string>
+  <string name="morphe_hold_gesture_screen_summary">Изменяйте и фиксируйте скорость воспроизведения, а также выполняйте действия, перетаскивая палец после нажатия и удержания</string>
+  <string name="morphe_hold_gesture_title">Включить жест удержания</string>
+  <string name="morphe_hold_gesture_summary">После нажатия и удержания видео можно переместить палец. Скорость при удержании соответствует скорости воспроизведения при нажатии и удержании</string>
+  <string name="morphe_hold_gesture_press_to_swipe_summary">Не используется, когда включено «Нажатие для выполнения жестов». Нажмите, чтобы изменить</string>
+  <string name="morphe_hold_gesture_press_to_swipe_dialog_title">Нажатие для выполнения жестов включено</string>
+  <string name="morphe_hold_gesture_press_to_swipe_dialog_message">Жест удержания и жест «нажатие для выполнения жестов» в элементах управления свайпами начинаются с нажатия и удержания, поэтому может быть включен только один из них.</string>
+  <string name="morphe_hold_gesture_press_to_swipe_dialog_turn_off">Выключить нажатие для выполнения жестов</string>
+  <string name="morphe_hold_gesture_press_to_swipe_toast">Жест удержания не используется, когда включено «Нажатие для выполнения жестов»</string>
+  <string name="morphe_hold_gesture_dialog_title">Жест удержания включен</string>
+  <string name="morphe_hold_gesture_dialog_turn_off">Выключить жест удержания</string>
+  <string name="morphe_hold_gesture_haptic_feedback_title">Включить виброотклик при жестах</string>
+  <string name="morphe_hold_gesture_haptic_feedback_summary">Вибрирует при изменении скорости и при ее фиксации</string>
+  <string name="morphe_hold_gesture_speed_swipe_title">Перетащите в сторону, чтобы изменить скорость</string>
+  <string name="morphe_hold_gesture_speed_swipe_summary">После нажатия и удержания перетащите влево, чтобы замедлить воспроизведение, и вправо, чтобы ускорить его. Чем дальше перетаскивание, тем больше меняется скорость, пока палец не вернется назад</string>
+  <string name="morphe_hold_gesture_speed_step_title">Шаг скорости</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_title">Чувствительность перетаскивания</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_entry_1">Низкая</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_entry_2">Нормальная</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_entry_3">Высокая</string>
+  <string name="morphe_hold_gesture_speed_min_title">Минимальная скорость</string>
+  <string name="morphe_hold_gesture_speed_min_summary">Минимальная скорость, которой можно достичь при перетаскивании</string>
+  <string name="morphe_hold_gesture_speed_max_title">Максимальная скорость</string>
+  <string name="morphe_hold_gesture_speed_max_summary">Максимальная скорость перетягивания (до 8)</string>
+  <string name="morphe_hold_gesture_lock_title">Потяните вниз, чтобы зафиксировать скорость</string>
+  <string name="morphe_hold_gesture_lock_summary">После нажатия и удержания потяните вниз, чтобы сохранить скорость после отпускания пальца. Нажмите на значок или снова нажмите и удерживайте, чтобы разблокировать</string>
+  <string name="morphe_hold_gesture_lock_badge_always_title">Всегда показывать значок блокировки</string>
+  <string name="morphe_hold_gesture_lock_badge_always_summary">Показывать значок зафиксированной скорости, даже когда элементы управления плеером скрыты. Если функция отключена, значок отображается вместе с элементами управления плеером</string>
+  <string name="morphe_hold_gesture_unlock_on_video_change_title">Разблокировать при смене видео</string>
+  <string name="morphe_hold_gesture_unlock_on_video_change_summary">Фиксация скорости прекращается при запуске другого видео</string>
+  <string name="morphe_hold_gesture_lock_hint">Потяните вниз для блокировки</string>
+  <string name="morphe_hold_gesture_lock_release">Отпустить для блокировки %s</string>
+  <string name="morphe_hold_gesture_launcher_title">Перетащите вверх, чтобы открыть лаунчер</string>
+  <string name="morphe_hold_gesture_launcher_summary">После нажатия и удержания потяните вверх, чтобы отобразить действия вокруг пальца. Отпустите палец на действии, чтобы выполнить его</string>
+  <string name="morphe_hold_gesture_launcher_slot_count_title">Количество действий</string>
+  <string name="morphe_hold_gesture_launcher_slot_1_title">Действие 1</string>
+  <string name="morphe_hold_gesture_launcher_slot_2_title">Действие 2</string>
+  <string name="morphe_hold_gesture_launcher_slot_3_title">Действие 3</string>
+  <string name="morphe_hold_gesture_launcher_slot_4_title">Действие 4</string>
+  <string name="morphe_hold_gesture_launcher_slot_5_title">Действие 5</string>
+  <string name="morphe_hold_gesture_launcher_action_screen_lock">Блокировка экрана</string>
+  <string name="morphe_hold_gesture_launcher_action_loop">Повтор видео</string>
+  <string name="morphe_hold_gesture_launcher_action_loop_off">Остановить повтор</string>
+  <string name="morphe_hold_gesture_launcher_action_screenshot">Сохранить кадр</string>
+  <string name="morphe_hold_gesture_launcher_action_watch_later">Сохранить в «Смотреть позже»</string>
+  <string name="morphe_hold_gesture_launcher_action_timestamp_url">Копировать ссылку на текущее время</string>
+  <string name="morphe_hold_gesture_screen_unlock">Нажмите, чтобы разблокировать</string>
+  <string name="morphe_hold_gesture_frame_saved">Кадр сохранен в %s</string>
+  <string name="morphe_hold_gesture_frame_failed">Не удалось сохранить кадр</string>
   <!-- layout.captions.captionsPatch -->
   <string name="morphe_captions_screen_title">Субтитры</string>
   <string name="morphe_captions_screen_summary">Управление автоматическими субтитрами и cookie-файлами субтитров</string>
@@ -1216,6 +1291,9 @@ Second \"item\" text"</string>
   <!-- layout.playlistautoplay.disablePlaylistAutoplayPatch -->
   <string name="morphe_disable_playlist_autoplay_title">Отключить автовоспроизведение плейлиста</string>
   <string name="morphe_disable_playlist_autoplay_summary">Отключает автоматический переход к следующему видео в плейлистах</string>
+  <!-- layout.playlistautoplay.reversePlaylistAutoplayPatch -->
+  <string name="morphe_reverse_playlist_autoplay_title">Обратный порядок автовоспроизведения плейлиста</string>
+  <string name="morphe_reverse_playlist_autoplay_summary">Плейлисты воспроизводятся автоматически от последнего видео к первому. Миксы не воспроизводятся в обратном порядке</string>
   <!-- interaction.autoplay.autoplayControlPatch -->
   <string name="morphe_autoplay_control_title">Управление автовоспроизведением</string>
   <string name="morphe_autoplay_control_summary">Добавляет кнопку плеера и правило для следующего видео. Плейлисты и очереди продолжаются, Микс останавливается после определенного количества видео, рекомендованные видео никогда не воспроизводятся. Нажмите кнопку для переключения режима, нажмите и удерживайте для вызова списка</string>
@@ -1263,6 +1341,21 @@ Second \"item\" text"</string>
   <string name="morphe_fullscreen_video_scale_button_summary">Нажмите для переключения между режимами «По умолчанию», «Растянуть» и «Масштаб»</string>
   <string name="morphe_fullscreen_video_scale_button_fullscreen_only_title">Показывать только в полноэкранном режиме</string>
   <string name="morphe_fullscreen_video_scale_button_fullscreen_only_summary">Скрывать кнопку масштабирования видео в портретном плеере</string>
+  <!-- video.speed.replay.replayVideoPatch -->
+  <string name="morphe_replay_video_button_title">Показать кнопку \"Замедленный повтор\"</string>
+  <string name="morphe_replay_video_button_summary">Перематывает и временно замедляет видео. Нажмите еще раз, чтобы отменить</string>
+  <string name="morphe_replay_video_swipe_title">Смахните влево для замедленного повтора</string>
+  <string name="morphe_replay_video_swipe_summary">Смахните по видео влево, чтобы перемотать на 1–10 секунд назад в зависимости от длины свайпа. Управление свайпами и свайпы в верхней зоне имеют приоритет</string>
+  <string name="morphe_replay_video_swipe_preview">Повтор %s с</string>
+  <string name="morphe_replay_video_seconds_title">Длительность перемотки назад</string>
+  <string name="morphe_replay_video_seconds_summary">На сколько секунд кнопка перемотает видео назад</string>
+  <string name="morphe_replay_video_slow_seconds_title">Длительность замедленного воспроизведения</string>
+  <string name="morphe_replay_video_slow_seconds_summary">Сколько секунд видео будет воспроизводиться со скоростью повтора после перемотки</string>
+  <string name="morphe_replay_video_speed_title">Скорость повтора</string>
+  <string name="morphe_replay_video_speed_summary">Скорость воспроизведения повтора, например, 0.5. Повтор никогда не бывает быстрее текущей скорости</string>
+  <string name="morphe_replay_video_start">Замедленный повтор</string>
+  <string name="morphe_replay_video_unavailable">Замедленный повтор недоступен для этого видео</string>
+  <string name="morphe_replay_video_speed_invalid">Некорректная скорость повтора, сброшено до значения по умолчанию</string>
   <!-- layout.player.buttons.muteVideoButtonPatch -->
   <string name="morphe_mute_video_button_title">Показать кнопку отключения звука</string>
   <!-- layout.player.overlay.customPlayerOverlayOpacityPatch -->
@@ -1609,6 +1702,8 @@ Second \"item\" text"</string>
   <string name="morphe_video_delay_button_overlay_summary">Нажмите и удерживайте для сброса задержки до 0 мс</string>
   <string name="morphe_video_delay_button_flyout_title">Показать меню задержки видео</string>
   <string name="morphe_video_delay_dialog_input_hint">Задержка в миллисекундах</string>
+  <!-- video.effects.videoEffectsPatch -->
+  <string name="morphe_video_effect_button_flyout_title">Показать меню видеоэффектов</string>
   <!-- video.quality.rememberVideoQualityPatch -->
   <string name="morphe_remember_shorts_quality_last_selected_title">Запомнить качество Shorts</string>
   <string name="morphe_remember_shorts_quality_last_selected_summary">Применяет выбранное вами качество вручную ко всем будущим Shorts</string>
@@ -1697,10 +1792,6 @@ AVC (H.264)
   <string name="morphe_advanced_video_quality_menu_summary">Пропускает меню выбора качества и сразу открывает меню расширенных настроек качества</string>
   <!-- video.quality.hidePremiumVideoQualityPatch -->
   <string name="morphe_hide_premium_video_quality_title">Скрыть параметры Premium качества</string>
-  <!-- video.quality.prioritizeVideoQualityPatch -->
-  <string name="morphe_video_quality_prioritize_title">Приоритет качества видео</string>
-  <string name="morphe_video_quality_prioritize_summary">Отдает приоритет максимально доступному качеству видео перед эффективностью кодека</string>
-  <string name="morphe_video_quality_prioritize_dialog">Если эта настройка отключена, в старых видео могут отсутствовать варианты выбора качества</string>
   <!-- misc.spoof.spoofVideoStreamsPatch -->
   <string name="morphe_spoof_video_streams_av1_title">Разрешить \"Android VR\" / \"visionOS\" AV1</string>
   <string name="morphe_spoof_video_streams_av1_summary">Разрешает программное декодирование AV1 при использовании клиента \"Android VR\" / \"visionOS\"</string>

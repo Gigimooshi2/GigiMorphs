@@ -36,12 +36,15 @@ import app.morphe.patches.shared.misc.fix.proto.immutableMethodRef
 import app.morphe.patches.shared.misc.fix.proto.mutableCopyMethodRef
 import app.morphe.patches.shared.misc.fix.proto.parseByteArrayMethodRef
 import app.morphe.patches.shared.misc.fix.proto.parseByteArrayWithRegistryMethodRef
+import app.morphe.patches.shared.misc.settings.preference.BasePreference
 import app.morphe.patches.shared.misc.settings.preference.ListPreference
 import app.morphe.patches.shared.misc.settings.preference.NonInteractivePreference
 import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference
 import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference.Sorting
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
+import app.morphe.patches.youtube.layout.hide.general.MoreCommentsIconFingerprint
 import app.morphe.patches.youtube.layout.hide.shorts.ShortsBottomBarContainerFingerprint
+import app.morphe.patches.youtube.misc.commandrouter.commandRouterHookPatch
 import app.morphe.patches.youtube.misc.contexthook.Endpoint
 import app.morphe.patches.youtube.misc.contexthook.addOSNameHook
 import app.morphe.patches.youtube.misc.contexthook.clientContextHookPatch
@@ -98,6 +101,9 @@ private const val TOOLBAR_BUTTON_PROVIDER_INTERFACE =
 
 private const val PIVOT_BAR_ACCESS_INTERFACE =
     $$"Lapp/morphe/extension/youtube/patches/NavigationBarPatch$PivotBarAccess;"
+
+private const val BOTTOM_UI_HEIGHTS_INTERFACE =
+    $$"Lapp/morphe/extension/youtube/patches/NavigationBarPatch$BottomUiHeightsAccess;"
 
 private const val EXTENSION_SUBSCRIPTIONS_CLASS =
     "Lapp/morphe/extension/youtube/patches/ClassicSubscriptionsLayoutPatch;"
@@ -224,6 +230,7 @@ val navigationBarPatch = patch(
         fixProtoLibraryPatch,
         navigationBarResourcePatch,
         translucentNavigationBarFeatureFlagsPatch,
+        commandRouterHookPatch,
     )
 
     compatibleWith(COMPATIBILITY_YOUTUBE)
@@ -232,7 +239,7 @@ val navigationBarPatch = patch(
     hideSubscriptionsAppShortcutOption()
 
     execute {
-        val navPreferences = mutableSetOf(
+        val navPreferences = mutableSetOf<BasePreference>(
             SwitchPreference("morphe_hide_home_button"),
             SwitchPreference("morphe_hide_shorts_button"),
             SwitchPreference("morphe_hide_create_button"),
@@ -242,6 +249,14 @@ val navigationBarPatch = patch(
             SwitchPreference("morphe_show_watch_later_button"),
             SwitchPreference("morphe_show_settings_button"),
             SwitchPreference("morphe_show_settings_button_type", summary = true),
+        )
+
+        // Older versions have no account switcher, and the command opens the Google account sign in.
+        if (is_21_30_or_greater) {
+            navPreferences += SwitchPreference("morphe_you_button_account_switcher", summary = true)
+        }
+
+        navPreferences += listOf(
             NonInteractivePreference(
                 "morphe_navigation_buttons_order",
                 tag = "app.morphe.extension.youtube.settings.preference.NavigationButtonsOrderPreference",
@@ -495,6 +510,24 @@ val navigationBarPatch = patch(
             )
         }
 
+        // The live chat hides its scroll to bottom button by moving it below its container. With the bar covering
+        // the system navigation buttons, the room for them is left below the container, so the hidden button
+        // is still shown there. The container is set to cut the button off at its bounds.
+        MoreCommentsIconFingerprint.apply {
+            clearMatch()
+            matchAll().forEach { match ->
+                match.method.apply {
+                    val index = match.instructionMatches.last().index
+                    val buttonRegister = getInstruction<OneRegisterInstruction>(index).registerA
+
+                    addInstruction(
+                        index + 1,
+                        "invoke-static { v$buttonRegister }, $EXTENSION_CLASS->clipLiveChatScrollButton(Landroid/view/View;)V"
+                    )
+                }
+            }
+        }
+
         // The slim status bar ("No connection", "Back online") is laid out below the bar covering
         // the system navigation buttons, so the buttons cover it. The room for the buttons is moved
         // below it while it is shown.
@@ -646,6 +679,20 @@ val navigationBarPatch = patch(
                 "invoke-static { p0, p2 }, $EXTENSION_CLASS->onListScrolled(Landroid/view/View;I)V"
             )
 
+            // The app places the miniplayer and other views above the height it keeps for the navigation bar,
+            // which it sets to none only when it hides the bar itself. The extension sets the height again
+            // when it hides or shows the bar, and the height is none while the bar is hidden on scroll.
+            setBottomUiHeightFingerprint(BottomUiEnumFingerprint.originalClassDef.type).let {
+                it.method.addInstructions(
+                    0,
+                    """
+                        invoke-static { p0, p1, p2 }, $EXTENSION_CLASS->getBottomUiHeight(${BOTTOM_UI_HEIGHTS_INTERFACE}Ljava/lang/Enum;I)I
+                        move-result p2
+                    """
+                )
+                it.classDef.addPatchInterface(BOTTOM_UI_HEIGHTS_INTERFACE, "patch_setBottomUiHeight", it.method)
+            }
+
             // The AI search results hide the navigation bar through the controllers whatever the page sets.
             // The controllers are not called, and the header of the page still follows the scroll.
             if (is_21_42_or_greater) {
@@ -727,10 +774,15 @@ val navigationBarPatch = patch(
         implementPivotBarItemBuilder(PivotBarItemBuilderFingerprint)
 
         // The navigation bar handles the touches of its buttons itself, so the long press
-        // of the Settings button is found from the touches of the navigation bar.
-        PivotBarDispatchTouchEventFingerprint.method.addInstruction(
+        // of the Settings and 'You' buttons is found from the touches of the navigation bar.
+        // The touch that ends a long press is replaced, so the button is not tapped.
+        // This runs before the touch hook of the navigation bar hook patch, so it is not seen as a tap either.
+        PivotBarDispatchTouchEventFingerprint.method.addInstructions(
             0,
-            "invoke-static { p1 }, $EXTENSION_CLASS->navigationBarTouched(Landroid/view/MotionEvent;)V"
+            """
+                invoke-static { p1 }, $EXTENSION_CLASS->navigationBarTouched(Landroid/view/MotionEvent;)Landroid/view/MotionEvent;
+                move-result-object p1
+            """
         )
 
         // Allow the extension to read the proto of navigation bar items,

@@ -292,15 +292,129 @@ public final class WordSweepAnimator {
     private boolean[] clusterIsGlowing;
     private float[] clusterDrawX;
     private float[] clusterDrawY;
+    private float[] clusterRestY;
     private float[] clusterLastDrawY;
     private boolean[] clusterIsYMoving;
 
-    private boolean[] sylElevTriggered;
-    private float[] sylElevAnimFrom;
-    private float[] sylElevAnimTarget;
-    private float[] sylElevAnimDurationMs;
-    private long[] sylElevAnimStartMs;
-    private float[] sylElevCurrent;
+    private static final float RUBY_LINE_EXTRA_EM = 0.85f;
+
+    private ElevTracks sylElev;
+    private ElevTracks romanElev;
+    private float[][] romanLineElevY;
+    private boolean romanElevMoving = false;
+    private ElevTracks rubyElev;
+    private float[][] rubyLineElevY;
+    private boolean rubyElevMoving = false;
+    private int[][][] rubyOverlapClusters;
+
+    private static final class ElevTracks {
+        final long[] startTimesMs;
+        final boolean[] triggered;
+        final float[] animFrom;
+        final float[] animTarget;
+        final float[] animDurationMs;
+        final long[] animStartMs;
+        final float[] current;
+
+        ElevTracks(long[] startTimesMs) {
+            this.startTimesMs = startTimesMs;
+            int n = startTimesMs.length;
+            this.triggered = new boolean[n];
+            this.animFrom = new float[n];
+            this.animTarget = new float[n];
+            this.animDurationMs = new float[n];
+            Arrays.fill(this.animDurationMs, 1000f);
+            this.animStartMs = new long[n];
+            Arrays.fill(this.animStartMs, -1L);
+            this.current = new float[n];
+        }
+
+        boolean step(
+                long currentPosition,
+                boolean isActiveLine,
+                boolean wasActiveLine,
+                boolean isFirstRun,
+                float targetElev,
+                long nowUptimeMs) {
+            boolean anyMoving = false;
+            int count = startTimesMs.length;
+            for (int i = 0; i < count; i++) {
+                long startMs = startTimesMs[i];
+                if (!isActiveLine) {
+                    triggered[i] = false;
+                    if (isFirstRun && !wasActiveLine) {
+                        animFrom[i] = 0f;
+                        animTarget[i] = 0f;
+                        current[i] = 0f;
+                        animDurationMs[i] = 1000f;
+                        animStartMs[i] = nowUptimeMs - 1000L;
+                    } else if (wasActiveLine) {
+                        animFrom[i] = current[i];
+                        animTarget[i] = 0f;
+                        animDurationMs[i] = 1000f;
+                        animStartMs[i] = nowUptimeMs;
+                    }
+                } else {
+                    if (!wasActiveLine && currentPosition < startMs) {
+                        triggered[i] = false;
+                        animFrom[i] = 0f;
+                        animTarget[i] = 0f;
+                        current[i] = 0f;
+                        animDurationMs[i] = 1000f;
+                        animStartMs[i] = nowUptimeMs - 1000L;
+                    }
+                    if (currentPosition >= startMs && !triggered[i]) {
+                        triggered[i] = true;
+                        animFrom[i] = current[i];
+                        animTarget[i] = targetElev;
+                        animDurationMs[i] = 1000f;
+                        animStartMs[i] = nowUptimeMs;
+                    } else if (triggered[i] && animTarget[i] != targetElev) {
+                        animFrom[i] = current[i];
+                        animTarget[i] = targetElev;
+                        animDurationMs[i] = 1000f;
+                        animStartMs[i] = nowUptimeMs;
+                    } else if (currentPosition < startMs && triggered[i]) {
+                        triggered[i] = false;
+                        animFrom[i] = current[i];
+                        animTarget[i] = 0f;
+                        animDurationMs[i] = 1000f;
+                        animStartMs[i] = nowUptimeMs;
+                    } else if (animStartMs[i] < 0L) {
+                        animFrom[i] = 0f;
+                        animTarget[i] = 0f;
+                        current[i] = 0f;
+                        animDurationMs[i] = 1000f;
+                        animStartMs[i] = nowUptimeMs - 1000L;
+                    }
+                }
+
+                long elapsed = Math.max(0L, nowUptimeMs - animStartMs[i]);
+                float dur = animDurationMs[i] > 0f ? animDurationMs[i] : 1000f;
+                if (elapsed >= (long) dur) {
+                    current[i] = animTarget[i];
+                } else {
+                    float t = elapsed / dur;
+                    float eased = FAST_OUT_SLOW_IN.getInterpolation(t);
+                    current[i] = animFrom[i] + (animTarget[i] - animFrom[i]) * eased;
+                    anyMoving = true;
+                }
+                if (Math.abs(current[i] - animTarget[i]) > 0.001f) {
+                    anyMoving = true;
+                }
+            }
+            return anyMoving;
+        }
+
+        void reset() {
+            Arrays.fill(triggered, false);
+            Arrays.fill(animStartMs, -1L);
+            Arrays.fill(animDurationMs, 1000f);
+            Arrays.fill(current, 0f);
+            Arrays.fill(animTarget, 0f);
+            Arrays.fill(animFrom, 0f);
+        }
+    }
 
     private boolean[] heavyRelTriggered;
     private int[] heavyRelMode;
@@ -329,10 +443,10 @@ public final class WordSweepAnimator {
     private float curSimpleVel = 0f;
     private long lastDrawUptimeMs = -1L;
     private long lastRawUptimeMs = -1L;
-    private boolean lastWasPlaying = false;
     private long animClockMs = 10_000L;
     private boolean prewarmMasks;
     private boolean stillAnimating = false;
+    private boolean transitionAnimating = false;
 
     private final EmphasisSample sampleScratch = new EmphasisSample();
     private final WipeResult wipeScratch = new WipeResult();
@@ -425,7 +539,7 @@ public final class WordSweepAnimator {
         this.gradientWidth = fontSizePx;
         this.extraPaddingPx = fontSizePx * 0.4f;
         this.elevationAmount = fontSizePx * 0.05f;
-        this.glowBlurRadius = fontSizePx * 0.20f;
+        this.glowBlurRadius = fontSizePx * 0.10f;
         this.shadowBlurRadius = fontSizePx * 0.15f;
 
         List<int[]> ranges = WordAnimationUtils.shapingWordRanges(rawWords);
@@ -532,12 +646,12 @@ public final class WordSweepAnimator {
 
     private void recomputeVerticalMetrics() {
         float lineRomanExtra = hasSyllableRomanization ? (fontSizePx * 0.80f) : 0f;
-        float lineRubyExtra = hasRuby ? (fontSizePx * 0.70f) : 0f;
+        float lineRubyExtra = hasRuby ? (fontSizePx * RUBY_LINE_EXTRA_EM) : 0f;
         this.firstLineRubyOffset = lineRubyExtra;
         this.lineExtraHeight = lineRomanExtra + (lineCount > 1 ? lineRubyExtra : 0f);
         int bottomMargin = hasSyllableRomanization ? (int) (fontSizePx * 0.10f) : 0;
         this.extraRomanHeightPx = Math.round(hasSyllableRomanization ? (lineCount * (fontSizePx * 0.80f) + bottomMargin) : 0f);
-        this.extraRubyHeightPx = Math.round(hasRuby ? (lineCount * (fontSizePx * 0.70f)) : 0f);
+        this.extraRubyHeightPx = Math.round(hasRuby ? (lineCount * (fontSizePx * RUBY_LINE_EXTRA_EM)) : 0f);
         int totalExtraPx = (int) (lineCount * lineExtraHeight + firstLineRubyOffset);
         this.measuredHeight = textLayoutResult.getHeight() + totalExtraPx + bottomMargin;
     }
@@ -777,18 +891,22 @@ public final class WordSweepAnimator {
         this.clusterIsGlowing = new boolean[n];
         this.clusterDrawX = new float[n];
         this.clusterDrawY = new float[n];
+        this.clusterRestY = new float[n];
         this.clusterLastDrawY = new float[n];
         Arrays.fill(this.clusterLastDrawY, Float.NaN);
         this.clusterIsYMoving = new boolean[n];
 
-        this.sylElevTriggered = new boolean[sylCount];
-        this.sylElevAnimFrom = new float[sylCount];
-        this.sylElevAnimTarget = new float[sylCount];
-        this.sylElevAnimDurationMs = new float[sylCount];
-        Arrays.fill(this.sylElevAnimDurationMs, 1000f);
-        this.sylElevAnimStartMs = new long[sylCount];
-        Arrays.fill(this.sylElevAnimStartMs, -1L);
-        this.sylElevCurrent = new float[sylCount];
+        long[] sylStartTimes = new long[sylCount];
+        for (int i = 0; i < sylCount; i++) {
+            sylStartTimes[i] = (long) (alignedSyllables.get(i).syllable().startTime() * 1000.0);
+        }
+        this.sylElev = new ElevTracks(sylStartTimes);
+
+        this.romanLineElevY = new float[romanLines.length][];
+        this.romanElev = initClusterElev(romanLines, this.romanLineElevY);
+        this.rubyLineElevY = new float[rubyLines.length][];
+        this.rubyElev = initClusterElev(rubyLines, this.rubyLineElevY);
+        this.rubyOverlapClusters = buildRubyOverlapClusters(rubyLines, clusters);
 
         this.heavyRelTriggered = new boolean[n];
         this.heavyRelMode = new int[n];
@@ -851,6 +969,19 @@ public final class WordSweepAnimator {
         return stillAnimating;
     }
 
+    public boolean isTransitionAnimating() {
+        return transitionAnimating;
+    }
+
+    /** Clears active sweep progress without snapping visual color transitions. */
+    public void clearSeekProgress() {
+        lastActiveGX = 0f;
+        lastActivePosMs = Long.MIN_VALUE;
+        finishStartUptimeMs = -1L;
+        finishStartGX = 0f;
+        finishAlpha = 0f;
+    }
+
     private static final long OFF_WINDOW_EVICT_DELAY_MS = 600L;
 
     public void setPrewarmMasks(boolean prewarmMasks) {
@@ -895,17 +1026,12 @@ public final class WordSweepAnimator {
             int expressiveAccent,
             boolean hasJoining) {
         List<ClusterMeta> metaList = new ArrayList<>();
-        int i = 0;
         int textLen = formattedMainText.length();
-        while (i < textLen) {
-            int start = i;
-            int end = (i + 1 < textLen
-                    && Character.isHighSurrogate(formattedMainText.charAt(i))
-                    && Character.isLowSurrogate(formattedMainText.charAt(i + 1)))
-                    ? (i + 2) : (i + 1);
-            i = end;
-
-            if (formattedMainText.charAt(start) == '\n') continue;
+        List<int[]> graphemeList = WordAnimationUtils.graphemeRanges(formattedMainText);
+        for (int gi = 0; gi < graphemeList.size(); gi++) {
+            int[] range = graphemeList.get(gi);
+            int start = range[0];
+            int end = range[1];
 
             int safeStart = Math.max(0, Math.min(Math.max(0, textLen - 1), start));
             int safeEnd = Math.min(end, Math.max(0, textLen - 1));
@@ -914,7 +1040,7 @@ public final class WordSweepAnimator {
             float hStart = textLayoutResult.getPrimaryHorizontal(safeStart);
             float hEnd = (li == eli)
                     ? textLayoutResult.getPrimaryHorizontal(Math.min(end, textLen))
-                    : textLayoutResult.getLineRight(li);
+                    : (lineIsRtl[li] ? textLayoutResult.getLineLeft(li) : textLayoutResult.getLineRight(li));
             float x = Math.min(hStart, hEnd);
             float w = Math.abs(hEnd - hStart);
             float y = textLayoutResult.getLineTop(li);
@@ -928,17 +1054,15 @@ public final class WordSweepAnimator {
             ReconstructedWord word = reconstructedWords.get(wIdx);
             if (word.wordLen() <= 0 || word.syllables().isEmpty()) continue;
 
-            String firstSylText = word.syllables().get(0).syllable().text();
-            boolean isJoining = LyricsTextUtils.containsJoiningScript(firstSylText);
-
             StringBuilder wordTextSb = new StringBuilder();
             for (int s = 0; s < word.syllables().size(); s++) {
                 wordTextSb.append(word.syllables().get(s).syllable().text());
             }
             String wordText = wordTextSb.toString();
+            boolean isJoining = LyricsTextUtils.containsJoiningScript(wordText);
 
             List<List<ClusterMeta>> charGroups = new ArrayList<>();
-            if (!isBackground && !LyricsSpanBuilder.isRtlText(wordText) && !WordAnimationUtils.isNeedSplitOnly(wordText)) {
+            if (!isBackground && !LyricsSpanBuilder.isRtlText(wordText)) {
                 List<ClusterMeta> wordMetas = metasInRange(metaList, word.startIndex(), word.endIndex());
                 for (int m = 0; m < wordMetas.size(); m++) {
                     ClusterMeta cm = wordMetas.get(m);
@@ -968,10 +1092,8 @@ public final class WordSweepAnimator {
                 double e = Math.max(0.001, (double) wordDurationMs / 1000.0);
                 double delaySec = Math.min((e / numChars) * 0.4, 0.4);
                 float holdMs = (float) (2.0 * e / numChars * 1000.0);
-                float rawAmp = (float) Math.max(0.0, Math.min(1.0, e - 1.0));
-                float amplitude = 0.35f + 0.65f * rawAmp;
-                float rawGlow = (float) Math.max(0.0, Math.min(1.0, (e - 1.0) / 0.5));
-                float glowMax = 0.30f + 0.35f * rawGlow;
+                float amplitude = emphasisAmplitude(e);
+                float glowMax = emphasisGlowMax(e);
                 float half = Math.max(1f, (numChars - 1) / 2f);
 
                 for (int charIdx = 0; charIdx < charGroups.size(); charIdx++) {
@@ -1001,6 +1123,7 @@ public final class WordSweepAnimator {
         int curClusterLine = -1;
         List<VisualCluster> list = new ArrayList<>();
         int idx = 0;
+        final int postShiftBase = alignedSyllables.size();
         while (idx < metaList.size()) {
             ClusterMeta m = metaList.get(idx);
             if (m.lineIdx != curClusterLine) {
@@ -1017,7 +1140,7 @@ public final class WordSweepAnimator {
                     float clusterY = lineBaselines[m.lineIdx] - subLayout.getLineBaseline(0);
                     int sIdx = sylIndexFor(m, sylPointer);
                     if (sIdx >= 0) lastSylOnLine = sIdx;
-                    int shiftIdx = sIdx >= 0 ? sIdx : (lastSylOnLine >= 0 ? lastSylOnLine : sylPointer[0]);
+                    int shiftIdx = sIdx >= 0 ? sIdx : (lastSylOnLine >= 0 ? postShiftBase + lastSylOnLine : (sylPointer[0] < postShiftBase ? sylPointer[0] : -1));
                     list.add(new VisualCluster(
                             m.start, m.end, m.lineIdx, m.x, clusterY, m.width,
                             true, m.disableScale, false, m.isRtl,
@@ -1053,7 +1176,7 @@ public final class WordSweepAnimator {
                     float clusterY = lineBaselines[m.lineIdx] - subLayout.getLineBaseline(0);
                     int sIdx = sylIndexFor(m, sylPointer);
                     if (sIdx >= 0) lastSylOnLine = sIdx;
-                    int shiftIdx = sIdx >= 0 ? sIdx : (lastSylOnLine >= 0 ? lastSylOnLine : sylPointer[0]);
+                    int shiftIdx = sIdx >= 0 ? sIdx : (lastSylOnLine >= 0 ? postShiftBase + lastSylOnLine : (sylPointer[0] < postShiftBase ? sylPointer[0] : -1));
                     list.add(new VisualCluster(
                             m.start, last.end, m.lineIdx, runLeft, clusterY, runRight - runLeft,
                             true, m.disableScale, true, m.isRtl,
@@ -1067,7 +1190,7 @@ public final class WordSweepAnimator {
             } else {
                 int runSylIdx = sylIndexFor(m, sylPointer);
                 if (runSylIdx >= 0) lastSylOnLine = runSylIdx;
-                int runShiftIdx = runSylIdx >= 0 ? runSylIdx : (lastSylOnLine >= 0 ? lastSylOnLine : sylPointer[0]);
+                int runShiftIdx = runSylIdx >= 0 ? runSylIdx : (lastSylOnLine >= 0 ? postShiftBase + lastSylOnLine : (sylPointer[0] < postShiftBase ? sylPointer[0] : -1));
                 int j = idx;
                 while (j + 1 < metaList.size()
                         && !metaList.get(j + 1).isHeavy
@@ -1310,8 +1433,12 @@ public final class WordSweepAnimator {
         }
     }
 
+    private boolean shouldHoldBackgroundLit(boolean allSung) {
+        return isBackground && allSung && Settings.LYRICS_SPLIT_BACKGROUND.get();
+    }
+
     private void updateColorAndSimpleStates(long currentPosition, boolean isActiveLine, boolean allSung, long nowUptimeMs) {
-        float targetCS = (!isActiveLine && !(isBackground && allSung)) ? 1f : 0f;
+        float targetCS = (!isActiveLine && !shouldHoldBackgroundLit(allSung)) ? 1f : 0f;
         float targetSS = (isActiveLine && currentPosition >= lineStartTime && currentPosition <= effectiveEndTimeMs) ? 1f : 0f;
 
         if (isFirstRun || lastDrawUptimeMs < 0L) {
@@ -1486,67 +1613,104 @@ public final class WordSweepAnimator {
             }
         }
 
-        // Syllable elevation tween (1000ms FastOutSlowInEasing).
-        final float targetElev = -elevationAmount;
-        for (int sIdx = 0; sIdx < sylCount; sIdx++) {
-            long startMs = (long) (alignedSyllables.get(sIdx).syllable().startTime() * 1000.0);
-            if (!isActiveLine) {
-                sylElevTriggered[sIdx] = false;
-                if (isFirstRun && !wasActiveLine) {
-                    sylElevAnimFrom[sIdx] = 0f;
-                    sylElevAnimTarget[sIdx] = 0f;
-                    sylElevCurrent[sIdx] = 0f;
-                    sylElevAnimDurationMs[sIdx] = 1000f;
-                    sylElevAnimStartMs[sIdx] = nowUptimeMs - 1000L;
-                } else if (wasActiveLine) {
-                    sylElevAnimFrom[sIdx] = sylElevCurrent[sIdx];
-                    sylElevAnimTarget[sIdx] = 0f;
-                    sylElevAnimDurationMs[sIdx] = 1000f;
-                    sylElevAnimStartMs[sIdx] = nowUptimeMs;
-                }
-            } else {
-                if (!wasActiveLine && currentPosition < startMs) {
-                    sylElevTriggered[sIdx] = false;
-                    sylElevAnimFrom[sIdx] = 0f;
-                    sylElevAnimTarget[sIdx] = 0f;
-                    sylElevCurrent[sIdx] = 0f;
-                    sylElevAnimDurationMs[sIdx] = 1000f;
-                    sylElevAnimStartMs[sIdx] = nowUptimeMs - 1000L;
-                }
-                if (currentPosition >= startMs && !sylElevTriggered[sIdx]) {
-                    sylElevTriggered[sIdx] = true;
-                    sylElevAnimFrom[sIdx] = sylElevCurrent[sIdx];
-                    sylElevAnimTarget[sIdx] = targetElev;
-                    sylElevAnimDurationMs[sIdx] = 1000f;
-                    sylElevAnimStartMs[sIdx] = nowUptimeMs;
-                } else if (sylElevTriggered[sIdx] && sylElevAnimTarget[sIdx] != targetElev) {
-                    sylElevAnimFrom[sIdx] = sylElevCurrent[sIdx];
-                    sylElevAnimTarget[sIdx] = targetElev;
-                    sylElevAnimDurationMs[sIdx] = 1000f;
-                    sylElevAnimStartMs[sIdx] = nowUptimeMs;
-                } else if (currentPosition < startMs && sylElevTriggered[sIdx]) {
-                    sylElevTriggered[sIdx] = false;
-                    sylElevAnimFrom[sIdx] = sylElevCurrent[sIdx];
-                    sylElevAnimTarget[sIdx] = 0f;
-                    sylElevAnimDurationMs[sIdx] = 1000f;
-                    sylElevAnimStartMs[sIdx] = nowUptimeMs;
-                } else if (sylElevAnimStartMs[sIdx] < 0L) {
-                    sylElevAnimFrom[sIdx] = 0f;
-                    sylElevAnimTarget[sIdx] = 0f;
-                    sylElevCurrent[sIdx] = 0f;
-                    sylElevAnimDurationMs[sIdx] = 1000f;
-                    sylElevAnimStartMs[sIdx] = nowUptimeMs - 1000L;
-                }
-            }
+        // Syllable, romanization, and ruby elevation tween (1000ms FastOutSlowInEasing).
+        sylElev.step(currentPosition, isActiveLine, wasActiveLine, isFirstRun, -elevationAmount, nowUptimeMs);
+        romanElevMoving = romanElev.step(
+                currentPosition, isActiveLine, wasActiveLine, isFirstRun, -elevationAmount * 0.7f, nowUptimeMs);
+        copyElevTracksToLines(romanElev.current, romanLines, romanLineElevY);
+        rubyElevMoving = rubyElev.step(
+                currentPosition, isActiveLine, wasActiveLine, isFirstRun, -elevationAmount, nowUptimeMs);
+    }
 
-            long elapsed = Math.max(0L, nowUptimeMs - sylElevAnimStartMs[sIdx]);
-            float dur = sylElevAnimDurationMs[sIdx] > 0f ? sylElevAnimDurationMs[sIdx] : 1000f;
-            if (elapsed >= (long) dur) {
-                sylElevCurrent[sIdx] = sylElevAnimTarget[sIdx];
-            } else {
-                float t = elapsed / dur;
-                float eased = FAST_OUT_SLOW_IN.getInterpolation(t);
-                sylElevCurrent[sIdx] = sylElevAnimFrom[sIdx] + (sylElevAnimTarget[sIdx] - sylElevAnimFrom[sIdx]) * eased;
+    private static ElevTracks initClusterElev(List<RomanizedWordCluster>[] lines, float[][] outLineY) {
+        int total = 0;
+        for (int li = 0; li < lines.length; li++) {
+            List<RomanizedWordCluster> lineCs = lines[li];
+            int sz = (lineCs != null) ? lineCs.size() : 0;
+            outLineY[li] = new float[sz];
+            total += sz;
+        }
+        long[] startTimes = new long[total];
+        int flatIdx = 0;
+        for (int li = 0; li < lines.length; li++) {
+            List<RomanizedWordCluster> lineCs = lines[li];
+            if (lineCs == null) continue;
+            for (int i = 0; i < lineCs.size(); i++) {
+                startTimes[flatIdx++] = lineCs.get(i).wordStartMs();
+            }
+        }
+        return new ElevTracks(startTimes);
+    }
+
+    private static void copyElevTracksToLines(
+            float[] flatCurrent,
+            List<RomanizedWordCluster>[] lines,
+            float[][] outLineY) {
+        int flatIdx = 0;
+        for (int li = 0; li < lines.length; li++) {
+            float[] lineY = outLineY[li];
+            for (int i = 0; i < lineY.length; i++) {
+                lineY[i] = flatCurrent[flatIdx++];
+            }
+        }
+    }
+
+    private static int[][][] buildRubyOverlapClusters(
+            List<RomanizedWordCluster>[] rubyLines,
+            List<VisualCluster> mainClusters) {
+        int[][][] overlaps = new int[rubyLines.length][][];
+        int[] scratch = new int[mainClusters.size()];
+        for (int li = 0; li < rubyLines.length; li++) {
+            List<RomanizedWordCluster> lineCs = rubyLines[li];
+            int sz = (lineCs != null) ? lineCs.size() : 0;
+            overlaps[li] = new int[sz][];
+            for (int i = 0; i < sz; i++) {
+                RomanizedWordCluster rc = lineCs.get(i);
+                int count = 0;
+                for (int k = 0; k < mainClusters.size(); k++) {
+                    VisualCluster vc = mainClusters.get(k);
+                    if (vc.lineIdx() == li && vc.start() < rc.endIndex() && vc.end() > rc.startIndex()) {
+                        scratch[count++] = k;
+                    }
+                }
+                overlaps[li][i] = Arrays.copyOf(scratch, count);
+            }
+        }
+        return overlaps;
+    }
+
+    static float clusterTopDelta(float drawY, float baseY, float scaleX, float pivotY) {
+        return (drawY - baseY) - Math.max(0f, scaleX - 1f) * pivotY;
+    }
+
+    static float resolveRubyClusterElevY(
+            float baseRubyElev,
+            int[] overlapIndices,
+            float[] drawY,
+            float[] baseY,
+            float[] scaleX,
+            float[] pivotY) {
+        float elev = baseRubyElev;
+        for (int k = 0; k < overlapIndices.length; k++) {
+            int idx = overlapIndices[k];
+            elev = Math.min(elev, clusterTopDelta(drawY[idx], baseY[idx], scaleX[idx], pivotY[idx]));
+        }
+        return elev;
+    }
+
+    private void updateRubyLineElevY() {
+        int rFlatIdx = 0;
+        for (int li = 0; li < rubyLines.length; li++) {
+            float[] lineY = rubyLineElevY[li];
+            int[][] lineOverlaps = rubyOverlapClusters[li];
+            for (int i = 0; i < lineY.length; i++) {
+                lineY[i] = resolveRubyClusterElevY(
+                        rubyElev.current[rFlatIdx++],
+                        lineOverlaps[i],
+                        clusterDrawY,
+                        clusterRestY,
+                        clusterScaleX,
+                        statics.pivotY());
             }
         }
     }
@@ -1578,14 +1742,13 @@ public final class WordSweepAnimator {
             everActivated = true;
         }
         long rawUptimeMs = SystemClock.uptimeMillis();
-        if (lastRawUptimeMs >= 0L && isPlaying && lastWasPlaying) {
+        if (lastRawUptimeMs >= 0L) {
             long elapsed = rawUptimeMs - lastRawUptimeMs;
             if (elapsed > 0L && elapsed < 250L) {
                 animClockMs += elapsed;
             }
         }
         lastRawUptimeMs = rawUptimeMs;
-        lastWasPlaying = isPlaying;
         long nowUptimeMs = animClockMs;
         float safeSpeed = Math.max(0.1f, playbackSpeed);
 
@@ -1608,7 +1771,9 @@ public final class WordSweepAnimator {
                 && curGX >= 1f
                 && curGX <= (lineEndX - 0.5f);
 
+        final boolean holdBackgroundLit = shouldHoldBackgroundLit(allSung);
         boolean isDeactivatingFade = !isActiveLine
+                && !holdBackgroundLit
                 && reachedLineEnd
                 && (curColorState < 0.995f || curSimpleState > 0.005f);
 
@@ -1629,7 +1794,7 @@ public final class WordSweepAnimator {
                 ? WordAnimationUtils.lerpColor(baseUnlitColor, pastColor, finishAlpha)
                 : baseUnlitColor;
 
-        boolean showWipe = isActiveLine || isFinishing || isDeactivatingFade || (isBackground && allSung);
+        boolean showWipe = isActiveLine || isFinishing || isDeactivatingFade || holdBackgroundLit;
         int lineColorValue = showWipe ? Color.TRANSPARENT : lineColor;
         float simpleFrac = (currentPosition > effectiveEndTimeMs) ? 0f : Math.max(0f, Math.min(1f, curSimpleState));
         int inactiveColor = !showWipe
@@ -1648,12 +1813,18 @@ public final class WordSweepAnimator {
         }
         boolean shiftActive = hasRomanShift && shiftProgress < 0.999f;
 
+        long romaPosMs = (isActiveLine && lastActivePosMs != Long.MIN_VALUE) ? lastActivePosMs : currentPosition;
+        boolean romaForcePast = shouldForceRomanPast(
+                allSung, isActiveLine, reachedLineEnd, isFinishing, isDeactivatingFade);
         if (!smoothSweep) {
             drawSimple(
                     canvas, showWipe, shiftActive, shiftProgress, wipeSylIdx, wipeLineIdx, curGX,
                     effLastOfLine, effSylProgress,
-                    pastColor, unlitColor, litColor, lineColor, expressiveAccent);
-            stillAnimating = isActiveLine || isFinishing || isDeactivatingFade;
+                    pastColor, unlitColor, litColor, lineColor, expressiveAccent,
+                    romaPosMs, romaForcePast);
+            transitionAnimating = isFinishing || isDeactivatingFade
+                    || isColorStateConverging(currentPosition, isActiveLine, allSung);
+            stillAnimating = isActiveLine || transitionAnimating;
         } else {
             boolean drewFastInactive = false;
             if (!showWipe
@@ -1669,7 +1840,8 @@ public final class WordSweepAnimator {
                             canvas, false, wipeSylIdx, wipeLineIdx, curGX,
                             effLastOfLine, effSylProgress,
                             pastColor, unlitColor, litColor, lineColor,
-                            curSimpleState, expressiveAccent);
+                            curSimpleState, expressiveAccent, romaPosMs, romaForcePast, null, null);
+                    transitionAnimating = false;
                     stillAnimating = false;
                     drewFastInactive = true;
                 } else if (shiftActive) {
@@ -1678,7 +1850,8 @@ public final class WordSweepAnimator {
                             canvas, false, wipeSylIdx, wipeLineIdx, curGX,
                             effLastOfLine, effSylProgress,
                             pastColor, unlitColor, litColor, lineColor,
-                            curSimpleState, expressiveAccent);
+                            curSimpleState, expressiveAccent, romaPosMs, romaForcePast, null, null);
+                    transitionAnimating = false;
                     stillAnimating = false;
                     drewFastInactive = true;
                 }
@@ -1686,10 +1859,11 @@ public final class WordSweepAnimator {
             if (!drewFastInactive) {
                 updateSmoothAnimationStates(currentPosition, isActiveLine, safeSpeed, nowUptimeMs);
                 drawSmooth(
-                        canvas, currentPosition, isActiveLine, isFinishing, isDeactivatingFade, showWipe,
+                        canvas, currentPosition, isActiveLine, allSung, isFinishing, isDeactivatingFade, showWipe,
                         shiftProgress, wipeSylIdx, wipeLineIdx, curGX,
                         effLastOfLine, effSylProgress,
-                        pastColor, unlitColor, litColor, inactiveColor, lineColor, expressiveAccent, nowUptimeMs);
+                        pastColor, unlitColor, litColor, inactiveColor, lineColor, expressiveAccent, nowUptimeMs,
+                        romaPosMs, romaForcePast);
             }
         }
 
@@ -1702,6 +1876,15 @@ public final class WordSweepAnimator {
         wasActiveLine = isActiveLine;
         isFirstRun = false;
         lastDrawUptimeMs = nowUptimeMs;
+    }
+
+    static boolean shouldForceRomanPast(
+            boolean allSung,
+            boolean isActiveLine,
+            boolean reachedLineEnd,
+            boolean isFinishing,
+            boolean isDeactivatingFade) {
+        return allSung || (!isActiveLine && reachedLineEnd && !isFinishing && isDeactivatingFade);
     }
 
     private void ensureUnromanPositions() {
@@ -1892,7 +2075,11 @@ public final class WordSweepAnimator {
             int litColor,
             int lineColor,
             float curSimpleState,
-            int expressiveAccent) {
+            int expressiveAccent,
+            long romaPosMs,
+            boolean romaForcePast,
+            @Nullable float[][] romanElevY,
+            @Nullable float[][] rubyElevY) {
         final boolean allowMask = shouldRasterizeMaskNow();
         if (!romanStatics.isEmpty() && romaReveal > 0f) {
             WordAnimationUtils.drawRomanizedWordClusters(
@@ -1901,7 +2088,8 @@ public final class WordSweepAnimator {
                     scaleAlpha(pastColor, romaReveal), scaleAlpha(unlitColor, romaReveal), scaleAlpha(litColor, romaReveal),
                     showWipe ? Color.TRANSPARENT : scaleAlpha(lineColor, romaReveal),
                     curSimpleState, scaleAlpha(expressiveAccent, romaReveal),
-                    romaScaleProgress, fontSizePx * 0.14f, alignment, measuredWidth, allowMask);
+                    romaScaleProgress, fontSizePx * 0.14f, alignment, measuredWidth, allowMask,
+                    true, romaPosMs, romaForcePast, romanElevY);
         }
         if (!rubyStatics.isEmpty() && romaReveal > 0f) {
             WordAnimationUtils.drawRomanizedWordClusters(
@@ -1910,7 +2098,8 @@ public final class WordSweepAnimator {
                     scaleAlpha(pastColor, romaReveal), scaleAlpha(unlitColor, romaReveal), scaleAlpha(litColor, romaReveal),
                     showWipe ? Color.TRANSPARENT : scaleAlpha(lineColor, romaReveal),
                     curSimpleState, scaleAlpha(expressiveAccent, romaReveal),
-                    romaScaleProgress, -fontSizePx * 0.14f, alignment, measuredWidth, allowMask);
+                    romaScaleProgress, -fontSizePx * 0.14f, alignment, measuredWidth, allowMask,
+                    false, romaPosMs, romaForcePast, rubyElevY);
         }
     }
 
@@ -1928,7 +2117,9 @@ public final class WordSweepAnimator {
             int unlitColor,
             int litColor,
             int lineColor,
-            int expressiveAccent) {
+            int expressiveAccent,
+            long romaPosMs,
+            boolean romaForcePast) {
         if (!showWipe && !shiftActive && ensureStaticMainMask() && staticMainMask != null) {
             staticMainMaskPaint.setColor(lineColor);
             canvas.drawBitmap(
@@ -1960,13 +2151,21 @@ public final class WordSweepAnimator {
                 canvas, showWipe, wipeSylIdx, wipeLineIdx, curGX,
                 effLastOfLine, effSylProgress,
                 pastColor, unlitColor, litColor, lineColor,
-                0f, expressiveAccent);
+                0f, expressiveAccent, romaPosMs, romaForcePast, null, null);
+    }
+
+    private boolean isColorStateConverging(long currentPosition, boolean isActiveLine, boolean allSung) {
+        float targetCS = (!isActiveLine && !shouldHoldBackgroundLit(allSung)) ? 1f : 0f;
+        float targetSS = (isActiveLine && currentPosition >= lineStartTime && currentPosition <= effectiveEndTimeMs) ? 1f : 0f;
+        return Math.abs(curColorState - targetCS) > 0.002f
+                || Math.abs(curSimpleState - targetSS) > 0.002f;
     }
 
     private void drawSmooth(
             Canvas canvas,
             long currentPosition,
             boolean isActiveLine,
+            boolean allSung,
             boolean isFinishing,
             boolean isDeactivatingFade,
             boolean showWipe,
@@ -1982,22 +2181,30 @@ public final class WordSweepAnimator {
             int inactiveColor,
             int lineColor,
             int expressiveAccent,
-            long nowUptimeMs) {
+            long nowUptimeMs,
+            long romaPosMs,
+            boolean romaForcePast) {
         long drawCurrentPos = isActiveLine ? currentPosition : 0L;
         ClusterMaskCache maskCache = (isActiveLine || isFinishing || isDeactivatingFade) ? maskCacheStore : null;
         int n = clusters.size();
         boolean anyGlow = false;
         boolean anyRunningAnim = isActiveLine || isFinishing || isDeactivatingFade;
+        boolean elevMoving = false;
+        boolean heavyReleasePending = false;
+        float activeGlowFade = isActiveLine ? 1f : Math.max(0f, 1f - curColorState);
 
         for (int idx = 0; idx < n; idx++) {
             VisualCluster vc = clusters.get(idx);
             final boolean isGrowableWord = vc.isHeavy();
             float elevValue = 0f;
+            boolean clusterElevActive = false;
             int sIdx = vc.syllableIndex() >= 0 ? vc.syllableIndex() : vc.shiftIndex();
-            if (sIdx >= 0 && sIdx < sylElevCurrent.length) {
-                elevValue = sylElevCurrent[sIdx];
-                float dur = sylElevAnimDurationMs[sIdx] > 0f ? sylElevAnimDurationMs[sIdx] : 1000f;
-                if (nowUptimeMs - sylElevAnimStartMs[sIdx] < (long) dur || Math.abs(elevValue - sylElevAnimTarget[sIdx]) > 0.001f) {
+            if (sIdx >= 0 && sIdx < sylElev.current.length) {
+                elevValue = sylElev.current[sIdx];
+                float dur = sylElev.animDurationMs[sIdx] > 0f ? sylElev.animDurationMs[sIdx] : 1000f;
+                if (nowUptimeMs - sylElev.animStartMs[sIdx] < (long) dur || Math.abs(elevValue - sylElev.animTarget[sIdx]) > 0.001f) {
+                    elevMoving = true;
+                    clusterElevActive = true;
                     anyRunningAnim = true;
                 }
             }
@@ -2021,6 +2228,7 @@ public final class WordSweepAnimator {
 
                 float heavyRelease = clusterReleaseValues[idx];
                 if (!isActiveLine && (heavyRelease < 1f || (deactivatedPosMs >= vc.wordStartMs() && clusterGrowValues[idx] < 1f))) {
+                    heavyReleasePending = true;
                     anyRunningAnim = true;
                 }
 
@@ -2034,7 +2242,8 @@ public final class WordSweepAnimator {
                         scale = 1f + emphasisScaleGain * pulse;
                         shift = vc.normX() * emphasisShiftEm * fontSizePx * pulse;
                     }
-                    glowAlpha = Math.max(0f, Math.min(1f, vc.charShadowIntensity() * sampleScratch.glow));
+                    glowAlpha = Math.max(0f, Math.min(1f,
+                            vc.charShadowIntensity() * sampleScratch.glow * activeGlowFade));
                 }
             } else {
                 lift = elevValue;
@@ -2044,35 +2253,40 @@ public final class WordSweepAnimator {
             float baseY = restBaseY(idx, shiftProgress);
             float drawX = baseX + shift;
             float drawY = baseY + lift + rise;
-            boolean isGlowing = !disableGlowAndGrow && isGrowableWord && isEmphasised;
+            boolean isGlowing = !disableGlowAndGrow && isGrowableWord && isEmphasised && glowAlpha > 0.005f;
 
             clusterScaleX[idx] = scale;
             clusterGlowAlphas[idx] = glowAlpha;
             clusterIsGlowing[idx] = isGlowing;
             clusterDrawX[idx] = drawX;
             clusterDrawY[idx] = drawY;
+            clusterRestY[idx] = baseY;
 
             float lastY = clusterLastDrawY[idx];
             boolean isYMoving = (!Float.isNaN(lastY) && Math.abs(drawY - lastY) > 0.001f)
-                    || Math.abs(drawY - baseY) > 0.001f;
+                    || clusterElevActive;
             clusterIsYMoving[idx] = isYMoving;
             clusterLastDrawY[idx] = drawY;
             if (isGlowing) anyGlow = true;
         }
+        updateRubyLineElevY();
 
         if (anyGlow) {
+            ColorFilter glowFilter = (maskCache != null)
+                    ? maskCache.glowTint.get(pastColor | 0xFF000000) : null;
             for (int idx = 0; idx < n; idx++) {
                 if (clusterIsGlowing[idx]) {
                     float glowAlpha = clusterGlowAlphas[idx];
                     if (glowAlpha <= 0f) continue;
-                    VisualCluster vc = clusters.get(idx);
                     float scale = clusterScaleX[idx];
                     float drawX = clusterDrawX[idx];
                     float drawY = clusterDrawY[idx];
                     float tx = drawX + extraPaddingPx;
                     float ty = drawY + extraPaddingPx;
 
-                    Bitmap glowMask = (maskCache != null) ? maskCache.obtainGlow(idx, vc.subLayout(), glowBlurRadius) : null;
+                    // Rasterized on demand when a seek lands on a cluster the prewarm has not reached.
+                    Bitmap glowMask = (maskCache != null && glowFilter != null)
+                            ? maskCache.obtainGlow(idx, clusters.get(idx).subLayout(), glowBlurRadius) : null;
                     if (glowMask != null) {
                         canvas.save();
                         canvas.translate(tx, ty);
@@ -2083,7 +2297,7 @@ public final class WordSweepAnimator {
                                 canvas,
                                 glowMask,
                                 maskCache.glowScaleOf(idx),
-                                maskCache.glowFilter,
+                                glowFilter,
                                 glowAlpha,
                                 true);
                         canvas.restore();
@@ -2110,7 +2324,7 @@ public final class WordSweepAnimator {
             boolean isScaling = cdScale != 1.0f;
             boolean isElevating = clusterIsYMoving[idx];
             boolean isAnimating = (isActiveLine || isFinishing || isDeactivatingFade) && (isScaling || isElevating);
-            Bitmap mask = (isAnimating && maskCache != null) ? maskCache.obtain(idx, vc.subLayout()) : null;
+            Bitmap mask = (isAnimating && maskCache != null) ? maskCache.peek(idx) : null;
 
             if (mask == null) {
                 if (isScaling) {
@@ -2171,16 +2385,24 @@ public final class WordSweepAnimator {
                 canvas, showWipe, wipeSylIdx, wipeLineIdx, curGX,
                 effLastOfLine, effSylProgress,
                 pastColor, unlitColor, litColor, lineColor,
-                curSimpleState, expressiveAccent);
+                curSimpleState, expressiveAccent, romaPosMs, romaForcePast, romanLineElevY, rubyLineElevY);
 
-        float targetCS = (!isActiveLine || currentPosition > effectiveEndTimeMs) ? 1f : 0f;
-        float targetSS = (isActiveLine && currentPosition >= lineStartTime && currentPosition <= effectiveEndTimeMs) ? 1f : 0f;
-        stillAnimating = anyRunningAnim
+        transitionAnimating = elevMoving
+                || romanElevMoving
+                || rubyElevMoving
+                || heavyReleasePending
                 || isFinishing
                 || isDeactivatingFade
-                || (!isActiveLine && (curSimpleState > 0.002f || (currentPosition >= lineStartTime && currentPosition <= effectiveEndTimeMs)))
-                || Math.abs(curColorState - targetCS) > 0.002f
-                || Math.abs(curSimpleState - targetSS) > 0.002f;
+                || isColorStateConverging(currentPosition, isActiveLine, allSung);
+        stillAnimating = anyRunningAnim || transitionAnimating;
+    }
+
+    static float emphasisAmplitude(double durationSec) {
+        return (float) Math.max(0.0, Math.min(1.0, durationSec - 1.0));
+    }
+
+    static float emphasisGlowMax(double durationSec) {
+        return 0.45f * (float) Math.max(0.0, Math.min(1.0, (durationSec - 1.0) / 0.5));
     }
 
     private static int scaleAlpha(int color, float factor) {
@@ -2190,11 +2412,7 @@ public final class WordSweepAnimator {
     }
 
     public void reset() {
-        lastActiveGX = 0f;
-        lastActivePosMs = Long.MIN_VALUE;
-        finishStartUptimeMs = -1L;
-        finishStartGX = 0f;
-        finishAlpha = 0f;
+        clearSeekProgress();
         curColorState = 0f;
         curColorVel = 0f;
         curSimpleState = 0f;
@@ -2204,10 +2422,10 @@ public final class WordSweepAnimator {
         wasActiveLine = false;
         isFirstRun = true;
         stillAnimating = false;
+        transitionAnimating = false;
         everActivated = false;
         lastDrawUptimeMs = -1L;
         lastRawUptimeMs = -1L;
-        lastWasPlaying = false;
         if (!renderStateBuilt) {
             return;
         }
@@ -2223,12 +2441,17 @@ public final class WordSweepAnimator {
         Arrays.fill(clusterScaleX, 1.0f);
         Arrays.fill(clusterGlowAlphas, 0f);
         Arrays.fill(clusterIsGlowing, false);
-        Arrays.fill(sylElevTriggered, false);
-        Arrays.fill(sylElevAnimStartMs, -1L);
-        Arrays.fill(sylElevAnimDurationMs, 1000f);
-        Arrays.fill(sylElevCurrent, 0f);
-        Arrays.fill(sylElevAnimTarget, 0f);
-        Arrays.fill(sylElevAnimFrom, 0f);
+        sylElev.reset();
+        romanElev.reset();
+        romanElevMoving = false;
+        for (float[] lineY : romanLineElevY) {
+            Arrays.fill(lineY, 0f);
+        }
+        rubyElev.reset();
+        rubyElevMoving = false;
+        for (float[] lineY : rubyLineElevY) {
+            Arrays.fill(lineY, 0f);
+        }
         Arrays.fill(clusterLastDrawY, Float.NaN);
     }
 

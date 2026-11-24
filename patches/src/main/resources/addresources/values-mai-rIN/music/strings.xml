@@ -21,7 +21,6 @@ Second \"item\" text"</string>
   <!-- layout.branding.customBrandingPatch -->
   <!-- layout.branding.header.changeHeaderPatch -->
   <!-- misc.album.albumMusicVideoPatch -->
-  <!-- 'Spoof video streams' should match the language used in 'morphe_spoof_video_streams_screen_title' -->
   <!-- misc.audiovideoswitch.enableAudioVideoSwitchPatch -->
   <!-- interaction.downloads.downloadsPatch -->
   <!-- 'Download' should be translated using the same localized wording YouTube displays for the menu. -->
@@ -38,7 +37,9 @@ Second \"item\" text"</string>
   <!-- interaction.remember.repeatstate.rememberRepeatStatePatch-->
   <!-- interaction.remember.shufflestate.rememberShuffleStatePatch -->
   <!-- interaction.pausewhenmuted.pauseWhenMutedPatch -->
+  <!-- interaction.sonos.sonosCastPatch -->
   <!-- video.speed.playbackSpeedPatch -->
+  <!-- video.effects.videoEffectsPatch -->
   <!-- layout.captions.disableAutoCaptionsPatch -->
   <!-- interaction.audioducking.disableAudioDuckingPatch -->
   <!-- interaction.likefilter.queueLikeFilterPatch -->
@@ -96,6 +97,7 @@ Second \"item\" text"</string>
   <!-- Number of votes saying the artist is AI. Example: 41 AI -->
   <!-- 'SoundProof' must be kept untranslated -->
   <!-- 'SoundProof' and 'SoundProof-Dumps' must be kept untranslated -->
+  <!-- layout.applemusicartwork.appleMusicArtworkPatch -->
   <!-- layout.lyrics.lyricsPatch -->
   <!-- Shown under the lyrics. The placeholder is a service name such as LRCLIB. -->
   <!-- Tappable label under the lyrics that turns the translation on. -->

@@ -61,7 +61,10 @@ Değişiklikler şunları içerir:
   <string name="morphe_hide_account_menu_title">Kütüphane / Siz alt menü filtresini etkinleştir</string>
   <string name="morphe_hide_account_menu_filter_strings_title">Kütüphane / Siz alt menü filtresi</string>
   <string name="morphe_hide_account_menu_filter_strings_summary">Filtrelemek istediğiniz Kütüphane / Siz alt menü adlarını yeni satırlarla ayırarak girin</string>
+  <string name="morphe_hide_account_menu_badges_title">Rozetleri Gizle</string>
   <string name="morphe_hide_account_menu_downloads_title">İndirmeleri gizle</string>
+  <string name="morphe_hide_account_menu_liked_videos_title">\"Beğendiğim videolar\" kısmını gizle</string>
+  <string name="morphe_hide_account_menu_watch_later_title">\"Daha sonra izle\" kısmını gizle</string>
   <string name="morphe_hide_album_cards_title">Albüm kartlarını gizle</string>
   <string name="morphe_hide_album_cards_summary">Sanatçı açıklamasının altındaki albüm kartlarını gizler</string>
   <string name="morphe_hide_artist_cards_title">Sanatçı kartlarını gizle</string>
@@ -420,6 +423,7 @@ Kısıtlamalar:
   <string name="morphe_hide_comments_live_chat_tooltips_summary">Sadece abonelere özel sohbet bildirimi gibi sohbet giriş çubuğunun yanında gösterilen araç ipucu pencerelerini gizler</string>
   <string name="morphe_hide_comments_menu_button_title">Menü düğmesini gizle</string>
   <string name="morphe_hide_comments_menu_button_summary">Her yorumun 3 noktalı menü düğmesini gizler</string>
+  <string name="morphe_hide_comments_none_yet_title">\'Henüz yorum yok\' önizlemesini gizle</string>
   <string name="morphe_hide_comments_preview_comment_title">Ön izlenen yorumu gizle</string>
   <string name="morphe_hide_comments_preview_comment_summary">Tam yorumlar bölümünü açmadan önce videonun altındaki yorum ön izlemesini gizler</string>
   <string name="morphe_hide_comments_preview_comment_hidden">Yorum Morphe tarafından gizlendi…</string>
@@ -427,8 +431,10 @@ Kısıtlamalar:
   <string name="morphe_minimal_comments_button_summary">Yorumlar düğmesinde görüntülenen kayan kartları ve sayfa seçicisini gizler</string>
   <string name="morphe_hide_comments_timestamp_button_title">Zaman damgası düğmesini gizle</string>
   <string name="morphe_hide_comments_top_fans_button_title">\'En iyi hayranlar\' düğmesini gizle</string>
+  <string name="morphe_hide_comments_topics_title">\'Konular\'ı gizle</string>
+  <string name="morphe_hide_comments_topics_summary">\'Konular\' filtre çubuğu seçeneğini ve videonun altındaki \'Konu\' yorum önizlemelerini gizler</string>
   <string name="morphe_hide_comments_translate_button_title">Çevir düğmesini gizle</string>
-  <string name="morphe_hide_comments_zero_state_title">\'Henüz yorum yok\' mesajını gizle</string>
+  <string name="morphe_hide_comments_visit_the_community_section_title">\'Topluluğu Ziyaret Et\' bölümünü gizle</string>
   <string name="morphe_sanitize_comments_highlighted_search_links_title">Öne çıkan arama bağlantılarını temizle</string>
   <string name="morphe_sanitize_comments_highlighted_search_links_summary">Öne çıkan arama bağlantılarını temizler, yalnızca orijinal düz metni bırakır</string>
   <!-- layout.hide.player.flyoutmenupanel.hidePlayerFlyoutMenuPatch -->
@@ -556,6 +562,8 @@ Kısıtlamalar:
   <string name="morphe_channel_whitelist_channel_added">Kanal beyaz listeye eklendi</string>
   <string name="morphe_channel_whitelist_channel_removed">Kanal beyaz listeden kaldırıldı</string>
   <!-- interaction.doubletap.doubleTapLengthPatch -->
+  <!-- Search dialog of comments search, channel search and playlist search. -->
+  <string name="morphe_search_dialog_search">Ara</string>
   <!-- interaction.channelsearch.channelSearchPatch -->
   <string name="morphe_channel_search_title">Kanalda ara</string>
   <string name="morphe_channel_search_summary">Kanal sayfalarına, yalnızca o kanalda arama yapmayı sağlayan ikinci bir arama düğmesi ekler.</string>
@@ -573,6 +581,13 @@ Kısıtlamalar:
   <string name="morphe_channel_search_sort_oldest">En eski</string>
   <string name="morphe_channel_search_sort_shortest">En kısa</string>
   <string name="morphe_channel_search_sort_longest">En uzun</string>
+  <!-- interaction.playlistsearch.playlistSearchPatch -->
+  <string name="morphe_playlist_search_title">Oynatma listesinde ara</string>
+  <string name="morphe_playlist_search_summary">Oynatma listesi sayfalarına, yalnızca o oynatma listesinde arama yapmayı sağlayan ikinci bir arama düğmesi ekler</string>
+  <string name="morphe_playlist_search_hint">Oynatma listesinde ara</string>
+  <string name="morphe_playlist_search_results">Oynatma listesi arama sonuçları</string>
+  <string name="morphe_playlist_search_no_results">Bu oynatma listesinde sonuç bulunamadı</string>
+  <string name="morphe_playlist_search_failed">Bu oynatma listesinde arama yapılamadı</string>
   <!-- interaction.copyvideolink.copyVideoLinkButtonPatch -->
   <string name="morphe_share_copy_link_button_success">Bağlantı panoya kopyalandı</string>
   <string name="morphe_share_copy_link_with_timestamp_button_success">Zaman damgasıyla birlikte bağlantı panoya kopyalandı</string>
@@ -647,6 +662,15 @@ Soru düğmesine sahip olan bir video bir kez açıldıktan sonra bu özellik, m
   <!-- layout.feedviews.feedViewCountPatch -->
   <string name="morphe_feed_view_count_title">İzlenme sayısını kapak resimlerinde göster</string>
   <string name="morphe_feed_view_count_summary">Akış videolarının izlenme sayısı başlığın altı yerine kapak resminin sol altında gösterilir. Raflardaki gibi bazı videolar izlenme sayısı göstermeyebilir</string>
+  <!-- layout.returnyoutubeusername.returnYouTubeUsernamePatch -->
+  <string name="morphe_return_youtube_username_screen_title">YouTube Kullanıcı Adına Dön</string>
+  <string name="morphe_return_youtube_username_screen_summary">Kullanıcı adları yerine kanal adlarını göster</string>
+  <string name="morphe_return_youtube_username_title">Kanal adlarını göster</string>
+  <string name="morphe_return_youtube_username_summary">Yorumlarda, video başlığının altında ve Shorts\'ta kullanıcı adları yerine kanal adları gösterilir</string>
+  <string name="morphe_return_youtube_username_display_format_title">Kanal adı biçimi</string>
+  <string name="morphe_return_youtube_username_display_format_entry_1">Kanal adı</string>
+  <string name="morphe_return_youtube_username_display_format_entry_2">Kanal adı (@kullanıcıad)</string>
+  <string name="morphe_return_youtube_username_display_format_entry_3">\@kullanıcıad (Kanal adı)</string>
   <!-- layout.returnyoutubedislike.returnYouTubeDislikePatch -->
   <string name="morphe_ryd_feed_like_count_title">Akış kapak fotoğrafı beğeni sayısını göster</string>
   <string name="morphe_ryd_feed_like_ratio_title">Akış kapak fotoğrafı beğeni oranını göster</string>
@@ -659,7 +683,6 @@ Soru düğmesine sahip olan bir video bir kez açıldıktan sonra bu özellik, m
   <string name="morphe_search_comments_summary">Aranan tüm kelimeleri içeren yalnızca yüklü yorumları görüntülemek için yorumlardaki arama düğmesine dokunun. Bir ifadeyi aramak için kelimeleri tırnak içine alın</string>
   <string name="morphe_search_comments_dialog_title">Yorumları ara</string>
   <string name="morphe_search_comments_hint">Aranacak kelimeler</string>
-  <string name="morphe_search_comments_search">Ara</string>
   <string name="morphe_search_comments_clear">Temizle</string>
   <string name="morphe_search_comments_applied">Yorumları aramak için sıralamayı değiştirin veya yorumları tekrar açın</string>
   <string name="morphe_search_comments_cleared">Arama temizlendi. Tüm yorumları görüntülemek için sıralamayı değiştirin veya yorumları tekrar açın</string>
@@ -833,6 +856,8 @@ Bilgi: Canlı yayınlarda çalışmayabilir"</string>
   <string name="morphe_play_all_button_type_entry_10">Üyelere özel videolar</string>
   <string name="morphe_play_all_button_type_entry_11">Üyelere özel Shorts</string>
   <string name="morphe_play_all_button_type_entry_12">Üyelere özel canlı yayınlar</string>
+  <string name="morphe_play_all_button_reverse_title">Ters sıra</string>
+  <string name="morphe_play_all_button_reverse_summary">Oluşturulan çalma listesi, son videodan ilk videoya doğru otomatik olarak oynatılır</string>
   <string name="morphe_play_all_button_not_available_toast">Kanal kimliği uyuşmazlığı nedeniyle oynatma listesi oluşturulamadı</string>
   <!-- interaction.playlistpanel.playlistPanelButtonPatch -->
   <string name="morphe_playlist_panel_button_title">Çalma Listesi düğmesini göster</string>
@@ -1029,6 +1054,56 @@ Bunu düzeltmek için 'Video akışlarını taklit et' seçeneğini etkinleştir
   <string name="morphe_swipe_overlay_style_entry_7">Dikey katman (minimal)</string>
   <string name="morphe_swipe_change_video_title">Kaydırarak video değiştirmeyi etkinleştir</string>
   <string name="morphe_swipe_change_video_summary">Tam ekran modunda kaydırarak sonraki veya önceki videoya geçin</string>
+  <!-- interaction.holdgesture.holdGesturePatch -->
+  <string name="morphe_hold_gesture_screen_title">Basılı tutma hareketi</string>
+  <string name="morphe_hold_gesture_screen_summary">Basılı tutup sürükleyerek oynatma hızını değiştirin ve kilitleyin ve eylemleri çalıştırın</string>
+  <string name="morphe_hold_gesture_title">Basılı tutma hareketini etkinleştir</string>
+  <string name="morphe_hold_gesture_summary">Videoya dokunup basılı tutma işlemi bir sürükleme ile takip edilebilir. Basılı tutma sırasındaki hız, dokunup basılı tutma oynatma hızıdır</string>
+  <string name="morphe_hold_gesture_press_to_swipe_summary">Basılı tutup kaydırma hareketi açıkken kullanılmaz. Değiştirmek için dokunun</string>
+  <string name="morphe_hold_gesture_press_to_swipe_dialog_title">Basılı tutup kaydırma hareketi etkin</string>
+  <string name="morphe_hold_gesture_press_to_swipe_dialog_message">Basılı tutma hareketi ve kaydırma kontrollerinin basılı tutup kaydırma hareketi, her ikisi de dokunup basılı tutmakla başladığı için bunlardan yalnızca biri açık olabilir.</string>
+  <string name="morphe_hold_gesture_press_to_swipe_dialog_turn_off">Basılı tutup kaydırma hareketini kapat</string>
+  <string name="morphe_hold_gesture_press_to_swipe_toast">Basılı tutup kaydırma hareketi açıkken basılı tutma hareketi kullanılmaz</string>
+  <string name="morphe_hold_gesture_dialog_title">Basılı tutma hareketi açık</string>
+  <string name="morphe_hold_gesture_dialog_turn_off">Basılı tutma hareketini kapat</string>
+  <string name="morphe_hold_gesture_haptic_feedback_title">Titreşimli geri bildirimi etkinleştir</string>
+  <string name="morphe_hold_gesture_haptic_feedback_summary">Hız değiştiğinde ve hız kilitlendiğinde titrer</string>
+  <string name="morphe_hold_gesture_speed_swipe_title">Hızı değiştirmek için yanlara sürükleyin</string>
+  <string name="morphe_hold_gesture_speed_swipe_summary">Dokunup basılı tuttuktan sonra, daha yavaş oynatmak için sola, daha hızlı oynatmak için sağa sürükleyin. Parmak geri gelene kadar, dışarıya doğru sürüklendikçe hız değişmeye devam eder</string>
+  <string name="morphe_hold_gesture_speed_step_title">Hız adımı</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_title">Sürükleme hassasiyeti</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_entry_1">Düşük</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_entry_2">Normal</string>
+  <string name="morphe_hold_gesture_speed_sensitivity_entry_3">Yüksek</string>
+  <string name="morphe_hold_gesture_speed_min_title">En düşük hız</string>
+  <string name="morphe_hold_gesture_speed_min_summary">Sürüklemenin ulaşabileceği en düşük hız</string>
+  <string name="morphe_hold_gesture_speed_max_title">En yüksek hız</string>
+  <string name="morphe_hold_gesture_speed_max_summary">Sürüklemenin ulaşabileceği en yüksek hız (8\'e kadar)</string>
+  <string name="morphe_hold_gesture_lock_title">Hızı kilitlemek için aşağı sürükleyin</string>
+  <string name="morphe_hold_gesture_lock_summary">Dokunup basılı tuttuktan sonra, parmak kaldırıldığında hızı korumak için aşağı sürükleyin. Kilidi açmak için rozete dokunun veya tekrar dokunup basılı tutun</string>
+  <string name="morphe_hold_gesture_lock_badge_always_title">Kilit rozetini her zaman göster</string>
+  <string name="morphe_hold_gesture_lock_badge_always_summary">Oynatıcı kontrolleri gösterilmediğinde bile kilitli hız rozetini gösterir. Kapalıysa, rozet oynatıcı kontrolleriyle birlikte gösterilir</string>
+  <string name="morphe_hold_gesture_unlock_on_video_change_title">Video değiştiğinde kilidi aç</string>
+  <string name="morphe_hold_gesture_unlock_on_video_change_summary">Başka bir video başladığında kilitli hız sona erer</string>
+  <string name="morphe_hold_gesture_lock_hint">Kilitlemek için aşağı çekin</string>
+  <string name="morphe_hold_gesture_lock_release">%s kilitlemek için bırakın</string>
+  <string name="morphe_hold_gesture_launcher_title">Başlatıcıyı açmak için yukarı sürükleyin</string>
+  <string name="morphe_hold_gesture_launcher_summary">Dokunup basılı tuttuktan sonra, parmağın etrafındaki eylemleri göstermek için yukarı kaydırın. Bir eylemi çalıştırmak için parmağınızı onun üzerinden kaldırın</string>
+  <string name="morphe_hold_gesture_launcher_slot_count_title">Eylem sayısı</string>
+  <string name="morphe_hold_gesture_launcher_slot_1_title">Eylem 1</string>
+  <string name="morphe_hold_gesture_launcher_slot_2_title">Eylem 2</string>
+  <string name="morphe_hold_gesture_launcher_slot_3_title">Eylem 3</string>
+  <string name="morphe_hold_gesture_launcher_slot_4_title">Eylem 4</string>
+  <string name="morphe_hold_gesture_launcher_slot_5_title">Eylem 5</string>
+  <string name="morphe_hold_gesture_launcher_action_screen_lock">Ekranı kilitle</string>
+  <string name="morphe_hold_gesture_launcher_action_loop">Videoyu döngüye al</string>
+  <string name="morphe_hold_gesture_launcher_action_loop_off">Döngüyü durdur</string>
+  <string name="morphe_hold_gesture_launcher_action_screenshot">Kareyi kaydet</string>
+  <string name="morphe_hold_gesture_launcher_action_watch_later">Daha sonra izle\'ye kaydet</string>
+  <string name="morphe_hold_gesture_launcher_action_timestamp_url">Geçerli zamandaki bağlantıyı kopyala</string>
+  <string name="morphe_hold_gesture_screen_unlock">Kilidi açmak için dokunun</string>
+  <string name="morphe_hold_gesture_frame_saved">Kare %s konumuna kaydedildi</string>
+  <string name="morphe_hold_gesture_frame_failed">Kare kaydedilemedi</string>
   <!-- layout.captions.captionsPatch -->
   <string name="morphe_captions_screen_title">Altyazılar</string>
   <string name="morphe_captions_screen_summary">Otomatik altyazıları ve altyazı çerezlerini yönetin</string>
@@ -1216,6 +1291,9 @@ Ayarlar → Oynatma (veya Otomatik Oynatma) → Sonraki videoyu otomatik oynat"<
   <!-- layout.playlistautoplay.disablePlaylistAutoplayPatch -->
   <string name="morphe_disable_playlist_autoplay_title">Çalma listelerinin otomatik olarak sonraki videoya geçmesini engeller</string>
   <string name="morphe_disable_playlist_autoplay_summary">Çalma listelerinin otomatik olarak bir sonraki videoya geçmesini engeller</string>
+  <!-- layout.playlistautoplay.reversePlaylistAutoplayPatch -->
+  <string name="morphe_reverse_playlist_autoplay_title">Çalma listesi otomatik oynatmayı tersine çevir</string>
+  <string name="morphe_reverse_playlist_autoplay_summary">Çalma listeleri son videodan ilk videoya doğru otomatik olarak oynatılır. Karışımlar tersine çevrilmez</string>
   <!-- interaction.autoplay.autoplayControlPatch -->
   <string name="morphe_autoplay_control_title">Otomatik oynatma kontrolü</string>
   <string name="morphe_autoplay_control_summary">Bir oynatıcı düğmesi ve sonraki video için bir kural ekler. Çalma listeleri ve kuyruklar devam eder, bir Mix belirli sayıda videodan sonra durur, önerilen bir video asla oynatılmaz. Sonraki mod için düğmeye dokunun, liste için basılı tutun</string>
@@ -1263,6 +1341,21 @@ Ayarlar → Oynatma (veya Otomatik Oynatma) → Sonraki videoyu otomatik oynat"<
   <string name="morphe_fullscreen_video_scale_button_summary">Varsayılan, Esnet ve Yakınlaştır arasında geçiş yapmak için dokunun</string>
   <string name="morphe_fullscreen_video_scale_button_fullscreen_only_title">Sadece tam ekranda göster</string>
   <string name="morphe_fullscreen_video_scale_button_fullscreen_only_summary">Dikey oynatıcıda video ölçekleme düğmesini gizle</string>
+  <!-- video.speed.replay.replayVideoPatch -->
+  <string name="morphe_replay_video_button_title">Daha yavaş yeniden oynat düğmesini göster</string>
+  <string name="morphe_replay_video_button_summary">Videoyu geri sarar ve geçici olarak yavaşlatır. İptal etmek için tekrar dokunun</string>
+  <string name="morphe_replay_video_swipe_title">Daha yavaş yeniden oynatmak için sola kaydırın</string>
+  <string name="morphe_replay_video_swipe_summary">Kaydırma uzunluğuna bağlı olarak videoyu 1-10 saniye geri sarmak için video üzerinde sola kaydırın. Kaydırma kontrolleri aramayı yönetir ve üst bölge kaydırmaları önceliğe sahiptir</string>
+  <string name="morphe_replay_video_swipe_preview">%s sn yeniden oynat</string>
+  <string name="morphe_replay_video_seconds_title">Geri sarma süresi</string>
+  <string name="morphe_replay_video_seconds_summary">Düğmenin videoyu kaç saniye geri saracağı</string>
+  <string name="morphe_replay_video_slow_seconds_title">Yavaş oynatma süresi</string>
+  <string name="morphe_replay_video_slow_seconds_summary">Geri sarma işleminden sonra videonun kaç saniyesinin yeniden oynatma hızında oynatılacağı</string>
+  <string name="morphe_replay_video_speed_title">Yeniden oynatma hızı</string>
+  <string name="morphe_replay_video_speed_summary">Yeniden oynatmanın, örneğin 0.5 gibi oynatma hızı. Yeniden oynatma hiçbir zaman mevcut hızdan daha hızlı değildir</string>
+  <string name="morphe_replay_video_start">Daha yavaş yeniden oynat</string>
+  <string name="morphe_replay_video_unavailable">Bu video için yavaş yeniden oynatma kullanılamıyor</string>
+  <string name="morphe_replay_video_speed_invalid">Geçersiz yeniden oynatma hızı, varsayılana sıfırlandı</string>
   <!-- layout.player.buttons.muteVideoButtonPatch -->
   <string name="morphe_mute_video_button_title">Sessiz düğmesini göster</string>
   <!-- layout.player.overlay.customPlayerOverlayOpacityPatch -->
@@ -1609,6 +1702,8 @@ Videolar, karma video kimliğinin kısa bir önekiyle istenir; bu nedenle sunucu
   <string name="morphe_video_delay_button_overlay_summary">Gecikmeyi 0 ms\'ye sıfırlamak için dokunup basılı tutun</string>
   <string name="morphe_video_delay_button_flyout_title">Video gecikmesi menüsünü göster</string>
   <string name="morphe_video_delay_dialog_input_hint">Milisaniye cinsinden gecikme</string>
+  <!-- video.effects.videoEffectsPatch -->
+  <string name="morphe_video_effect_button_flyout_title">Video efekti menüsünü göster</string>
   <!-- video.quality.rememberVideoQualityPatch -->
   <string name="morphe_remember_shorts_quality_last_selected_title">Shorts kalitesini hatırla</string>
   <string name="morphe_remember_shorts_quality_last_selected_summary">Manuel kalite seçiminizi gelecekteki tüm Shorts\'lara uygular</string>
@@ -1698,10 +1793,6 @@ AVC (H.264)
   <string name="morphe_advanced_video_quality_menu_summary">Kalite seçim menüsünü atlar ve doğrudan Gelişmiş kalite menüsünü açar</string>
   <!-- video.quality.hidePremiumVideoQualityPatch -->
   <string name="morphe_hide_premium_video_quality_title">Premium kalite seçeneklerini gizle</string>
-  <!-- video.quality.prioritizeVideoQualityPatch -->
-  <string name="morphe_video_quality_prioritize_title">Video kalitesine öncelik ver</string>
-  <string name="morphe_video_quality_prioritize_summary">Kodek verimliliğinden ziyade en yüksek video kalitesine öncelik verir</string>
-  <string name="morphe_video_quality_prioritize_dialog">Bu ayar devre dışı bırakılırsa, eski videolar için video kalitesi seçenekleri görüntülenmeyebilir</string>
   <!-- misc.spoof.spoofVideoStreamsPatch -->
   <string name="morphe_spoof_video_streams_av1_title">\'Android VR\' / \'visionOS\' AV1\'ye izin ver</string>
   <string name="morphe_spoof_video_streams_av1_summary">\'Android VR\' / \'visionOS\' istemcisi kullanılırken yazılımsal AV1 kod çözmeye izin verir</string>
