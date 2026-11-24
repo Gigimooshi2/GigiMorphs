@@ -1,0 +1,60 @@
+name: Reconcile the GigiMorphs patch catalog
+on:
+  push:
+    branches: [work/reddit-catalog-20261124]
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    env:
+      BASE: 80d4f99a9ceb2c06f268e5fb4c7702c35b6301b0
+      UPSTREAM: 9c625c6f48ef65f43c887fa9353d34387d8ac231
+      EXPECTED_TREE: 9c6bbcbb40452e59dc416906a665f8f027ada0f3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reconstruct the verified upstream and Gigi tree
+        id: snapshot
+        run: |
+          git fetch --depth=1 https://github.com/MorpheApp/morphe-patches.git "$UPSTREAM"
+          git switch --detach "$UPSTREAM"
+          git rm -qr .github
+          git checkout "$BASE" -- .github patches-bundle.json gigi
+          git checkout "$GITHUB_SHA" -- gigi/gigimorphs.patch
+          git apply --index --3way gigi/gigimorphs.patch
+          echo "$UPSTREAM" > .gigi-upstream
+          git add .gigi-upstream
+          tree=$(git write-tree)
+          test "$tree" = "$EXPECTED_TREE"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          sha=$(git commit-tree "$tree" -p "$BASE" -m "Sync Morphe dev and include four custom Reddit patches")
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the combined patch bundle
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew buildAndroid --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reconciled-gigi-bundle
+          path: |
+            patches/build/libs/patches-*.mpp
+            !patches/build/libs/*-sources.mpp
+            !patches/build/libs/*-javadoc.mpp
+          if-no-files-found: error
+          retention-days: 7
+      - name: Advance the tested Reddit branch
+        env:
+          SNAPSHOT: ${{ steps.snapshot.outputs.sha }}
+        run: git push origin "$SNAPSHOT:refs/heads/reddit/video-player"
