@@ -10,6 +10,7 @@ package app.morphe.extension.reddit.settings.preference.categories;
 import static app.morphe.extension.shared.StringRef.str;
 
 import android.content.Context;
+import android.content.Intent;
 import android.preference.Preference;
 import android.preference.PreferenceScreen;
 
@@ -24,6 +25,8 @@ import app.morphe.extension.reddit.patches.PrivateBrowsingModePatch;
 import app.morphe.extension.reddit.patches.RedgifsAudioPatch;
 import app.morphe.extension.reddit.patches.SanitizeSharingLinksPatch;
 import app.morphe.extension.reddit.patches.SharePostContentPatch;
+import app.morphe.extension.reddit.reports.CrashReports;
+import app.morphe.extension.reddit.reports.ReportActivity;
 import app.morphe.extension.reddit.settings.RedditActivityHook;
 import app.morphe.extension.reddit.settings.Settings;
 import app.morphe.extension.reddit.settings.preference.BooleanSettingPreference;
@@ -49,7 +52,7 @@ public class MiscellaneousPreferenceCategory extends ConditionalPreferenceCatego
 
     @Override
     public boolean getSettingsStatus() {
-        return AppIconPatch.isPatchIncluded() ||
+        return CrashReports.isPatchIncluded() || AppIconPatch.isPatchIncluded() ||
                 DownloadAllFromGalleryPatch.isPatchIncluded() ||
                 DownloadLocationPatch.isPatchIncluded() ||
                 EnableDebuggingPatch.isPatchIncluded() ||
@@ -65,6 +68,12 @@ public class MiscellaneousPreferenceCategory extends ConditionalPreferenceCatego
     @Override
     public void addPreferences(Context context) {
         MorpheAboutPreference.showVancedAsPastContributor(false);
+        if (CrashReports.isPatchIncluded()) {
+            Preference reports = new Preference(context);
+            reports.setTitle("Gigi crash reports");
+            reports.setIntent(new Intent(context, ReportActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            addPreference(reports);
+        }
         Preference about = new MorpheAboutPreference(context);
         about.setTitle(str("morphe_about_title"));
         about.setSummary(str("morphe_about_summary"));

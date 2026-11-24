@@ -8,6 +8,9 @@ import app.morphe.patcher.patch.AppTarget
 import app.morphe.patcher.patch.Compatibility
 import app.morphe.patcher.patch.mutableClassDefBy
 import app.morphe.patcher.patch.patch
+import app.morphe.patcher.patch.resourceXml
+import app.morphe.patches.reddit.misc.settings.settingsPatch
+import app.morphe.util.setExtensionIsPatchIncluded
 import app.morphe.patcher.string
 import app.morphe.patches.reddit.misc.extension.sharedExtensionPatch
 import app.morphe.patches.reddit.shared.Constants.COMPATIBILITY_REDDIT
@@ -195,6 +198,50 @@ val gigiPlayerControlsPatch = patch(
                 invoke-virtual { p0, p3, p1, p2 }, ${PLAYER}->y(IJ)V
                 return-void
             """)
+        }
+    }
+}
+
+private const val REPORT_PACKAGE = "app.morphe.extension.reddit.reports"
+private const val REPORT_QUEUE = "Lapp/morphe/extension/reddit/reports/CrashReports;"
+
+val gigiCrashUploadPatch = patch(
+    name = "Gigi crash report upload",
+    description = "Adds a crash reports launcher and an option to send Reddit crash reports to the private GigiMorphs logs repository."
+) {
+    compatibleWith(target)
+    dependsOn(settingsPatch)
+    execute {
+        setExtensionIsPatchIncluded(REPORT_QUEUE)
+        val logger = mutableClassDefBy("Lapp/morphe/extension/shared/patches/CrashLogPatch;")
+        // On every supported Android version Morphe passes the finished report here,
+        // including when its public write subsequently falls back to app-specific storage.
+        logger.methods.single { it.name == "writeToMediaStoreDocuments" }.addInstructions(
+            0, "invoke-static/range { p0 .. p2 }, $REPORT_QUEUE->capture(Landroid/content/Context;Ljava/lang/String;[B)V"
+        )
+        logger.methods.single { it.name == "setUncaughtExceptionHandler" }.addInstructions(
+            0, "invoke-static/range { p0 .. p0 }, $REPORT_QUEUE->resume(Landroid/content/Context;)V"
+        )
+        resourceXml("AndroidManifest.xml").use { manifest ->
+            val app = manifest.elements("application").single()
+            app.appendChild("activity") {
+                setAttribute("android:name", "$REPORT_PACKAGE.ReportActivity")
+                setAttribute("android:label", "Gigi crash reports")
+                setAttribute("android:exported", "true")
+                setAttribute("android:process", ":gigi_reports")
+                setAttribute("android:taskAffinity", "com.reddit.frontpage.gigi_reports")
+                setAttribute("android:theme", "@android:style/Theme.Material.Light")
+                appendChild("intent-filter") {
+                    appendChild("action") { setAttribute("android:name", "android.intent.action.MAIN") }
+                    appendChild("category") { setAttribute("android:name", "android.intent.category.LAUNCHER") }
+                }
+            }
+            app.appendChild("service") {
+                setAttribute("android:name", "$REPORT_PACKAGE.UploadJob")
+                setAttribute("android:exported", "false")
+                setAttribute("android:permission", "android.permission.BIND_JOB_SERVICE")
+                setAttribute("android:process", ":gigi_reports")
+            }
         }
     }
 }

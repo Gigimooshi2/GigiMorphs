@@ -1,9 +1,9 @@
 diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiNavigation.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiNavigation.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..761cd3e6c6ceaabe3b0871b7ef92ac3f8f2fafef
+index 00000000..46af659a
 --- /dev/null
 +++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiNavigation.java
-@@ -0,0 +1,232 @@
+@@ -0,0 +1,233 @@
 +package app.morphe.extension.reddit.patches;
 +
 +import android.app.Activity;
@@ -204,6 +204,7 @@ index 0000000000000000000000000000000000000000..761cd3e6c6ceaabe3b0871b7ef92ac3f
 +    }
 +
 +    @Override public void onActivityResumed(Activity activity) {
++        if (activity instanceof app.morphe.extension.reddit.reports.ReportActivity) return;
 +        FrameLayout decor = (FrameLayout) activity.getWindow().getDecorView();
 +        for (int i = 0; i < decor.getChildCount(); i++) {
 +            if (decor.getChildAt(i) instanceof Controls) return;
@@ -238,7 +239,7 @@ index 0000000000000000000000000000000000000000..761cd3e6c6ceaabe3b0871b7ef92ac3f
 +}
 diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiPlayerControls.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiPlayerControls.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0b8c301178cfce6b22f96f4aa71784b4e6d74bb4
+index 00000000..0b8c3011
 --- /dev/null
 +++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiPlayerControls.java
 @@ -0,0 +1,128 @@
@@ -372,7 +373,7 @@ index 0000000000000000000000000000000000000000..0b8c301178cfce6b22f96f4aa71784b4
 +}
 diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiVideo.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiVideo.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..c4091d3360e1f104698fbe114ada65451fb6109c
+index 00000000..c4091d33
 --- /dev/null
 +++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiVideo.java
 @@ -0,0 +1,32 @@
@@ -408,9 +409,463 @@ index 0000000000000000000000000000000000000000..c4091d3360e1f104698fbe114ada6545
 +        return selected;
 +    }
 +}
+diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/CrashReports.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/CrashReports.java
+new file mode 100644
+index 00000000..4deb2055
+--- /dev/null
++++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/CrashReports.java
+@@ -0,0 +1,154 @@
++package app.morphe.extension.reddit.reports;
++
++import android.app.job.JobInfo;
++import android.app.job.JobScheduler;
++import android.content.ComponentName;
++import android.content.ContentUris;
++import android.content.Context;
++import android.database.Cursor;
++import android.net.Uri;
++import android.os.Environment;
++import android.provider.MediaStore;
++import android.util.AtomicFile;
++import android.util.Log;
++
++import java.io.*;
++import java.nio.charset.StandardCharsets;
++import java.security.MessageDigest;
++import java.util.Arrays;
++import java.util.Locale;
++import java.util.regex.Pattern;
++
++public final class CrashReports {
++    static final String REPO = "Gigimooshi2/GigiMorphs-logs";
++    static final int JOB = 0x47494749;
++    static final int MAX_BYTES = 1024 * 1024;
++    private static final Pattern NAME = Pattern.compile("crash_com\\.reddit\\.frontpage_\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}(?: \\(\\d+\\))?\\.txt");
++    private static final byte[] TRUNCATED = "\n[Report truncated at 1 MiB]\n".getBytes(StandardCharsets.UTF_8);
++
++    public static boolean isPatchIncluded() { return false; }
++
++    static File directory(Context c) { return new File(c.getNoBackupFilesDir(), "gigi-reddit-reports"); }
++
++    static AtomicFile credential(Context c) {
++        return new AtomicFile(new File(directory(c), "credential"));
++    }
++
++    static File[] pending(Context c) {
++        File[] files = directory(c).listFiles((dir, name) -> name.startsWith("crash_") && name.endsWith(".txt"));
++        return files == null ? new File[0] : files;
++    }
++
++    static void save(AtomicFile file, byte[] data) throws IOException {
++        FileOutputStream out = file.startWrite();
++        try {
++            out.write(data);
++            file.finishWrite(out);
++        } catch (IOException e) {
++            file.failWrite(out);
++            throw e;
++        }
++    }
++
++    static String digest(String algorithm, byte[] data) throws Exception {
++        MessageDigest hash = MessageDigest.getInstance(algorithm);
++        if ("SHA-1".equals(algorithm)) {
++            hash.update(("blob " + data.length + "\0").getBytes(StandardCharsets.US_ASCII));
++        }
++        StringBuilder hex = new StringBuilder();
++        for (byte b : hash.digest(data)) hex.append(String.format(Locale.ROOT, "%02x", b & 255));
++        return hex.toString();
++    }
++
++    static byte[] read(InputStream source) throws IOException {
++        if (source == null) throw new IOException("Could not open the report");
++        try (InputStream in = source; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
++            byte[] buf = new byte[8192];
++            int count;
++            while ((count = in.read(buf)) != -1) {
++                int remaining = MAX_BYTES - out.size();
++                out.write(buf, 0, Math.min(remaining, count));
++                if (count > remaining) {
++                    out.write(TRUNCATED);
++                    break;
++                }
++            }
++            return out.toByteArray();
++        }
++    }
++
++    static void queue(Context c, String name, byte[] data) throws Exception {
++        String head = new String(data, 0, Math.min(data.length, 2048), StandardCharsets.UTF_8);
++        if (!NAME.matcher(name).matches() || !head.startsWith("Morphe crash log\n")
++                || !head.contains("\nApp: com.reddit.frontpage ")) {
++            throw new IOException("Choose a Reddit Morphe crash report");
++        }
++        String stem = name.substring(0, name.length() - 4).replaceAll(" \\(\\d+\\)$", "");
++        File target = new File(directory(c), stem + "_" + digest("SHA-256", data) + ".txt");
++        if (target.exists()) return;
++        if (pending(c).length >= 24) throw new IOException("Upload pending reports first");
++        // A job in another process must never see a partially written report.
++        File temp = File.createTempFile("writing-", ".tmp", directory(c));
++        try {
++            try (FileOutputStream out = new FileOutputStream(temp)) {
++                out.write(data);
++                out.getFD().sync();
++            }
++            if (!temp.renameTo(target)) throw new IOException("Could not queue report");
++        } finally {
++            if (temp.exists()) temp.delete();
++        }
++    }
++
++    // Called inside Morphe's crash writer. Local work only. Its normal report is always written.
++    public static void capture(Context c, String name, byte[] data) {
++        try {
++            if (!credential(c).getBaseFile().isFile()) return;
++            if (data.length > MAX_BYTES) data = read(new ByteArrayInputStream(data));
++            queue(c, name, data);
++            schedule(c);
++        } catch (Exception e) {
++            Log.w("GigiReports", "Could not queue crash report", e);
++        }
++    }
++
++    public static void resume(Context c) {
++        try {
++            if (credential(c).getBaseFile().isFile() && pending(c).length > 0) schedule(c);
++        } catch (RuntimeException e) {
++            Log.w("GigiReports", "Could not schedule uploads", e);
++        }
++    }
++
++    static void schedule(Context c) {
++        JobScheduler jobs = c.getSystemService(JobScheduler.class);
++        JobInfo job = new JobInfo.Builder(JOB, new ComponentName(c, UploadJob.class))
++                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
++                .setBackoffCriteria(30_000, JobInfo.BACKOFF_POLICY_EXPONENTIAL).build();
++        if (jobs.schedule(job) != JobScheduler.RESULT_SUCCESS) throw new IllegalStateException("Could not schedule upload");
++    }
++
++    // Import only the newest pre-update report visible to this installation.
++    static boolean importLatest(Context c) throws Exception {
++        Uri files = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
++        String[] fields = { MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME };
++        try (Cursor rows = c.getContentResolver().query(files, fields,
++                "relative_path = ? AND _display_name LIKE ?", new String[]{"Documents/Morphe/", "crash_com.reddit.frontpage_%.txt"},
++                "_display_name DESC")) {
++            if (rows != null) while (rows.moveToNext()) {
++                String name = rows.getString(1);
++                if (!NAME.matcher(name).matches()) continue;
++                Uri uri = ContentUris.withAppendedId(files, rows.getLong(0));
++                queue(c, name, read(c.getContentResolver().openInputStream(uri)));
++                return true;
++            }
++        }
++        File folder = c.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS);
++        File[] logs = folder == null ? null : folder.listFiles((dir, name) -> NAME.matcher(name).matches());
++        if (logs == null || logs.length == 0) return false;
++        Arrays.sort(logs);
++        File last = logs[logs.length - 1];
++        queue(c, last.getName(), read(new FileInputStream(last)));
++        return true;
++    }
++}
+diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/ReportActivity.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/ReportActivity.java
+new file mode 100644
+index 00000000..ac512514
+--- /dev/null
++++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/ReportActivity.java
+@@ -0,0 +1,127 @@
++package app.morphe.extension.reddit.reports;
++
++import android.app.Activity;
++import android.app.job.JobScheduler;
++import android.content.Intent;
++import android.content.SharedPreferences;
++import android.database.Cursor;
++import android.net.Uri;
++import android.os.Bundle;
++import android.provider.OpenableColumns;
++import android.text.InputType;
++import android.view.View;
++import android.view.WindowManager;
++import android.widget.*;
++
++import java.nio.charset.StandardCharsets;
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.Executors;
++
++public final class ReportActivity extends Activity implements SharedPreferences.OnSharedPreferenceChangeListener {
++    private static final int PICK = 1;
++    private final ExecutorService io = Executors.newSingleThreadExecutor();
++    private TextView status;
++    private EditText input;
++    private SharedPreferences prefs;
++    private Button save;
++
++    @Override protected void onCreate(Bundle state) {
++        super.onCreate(state);
++        getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
++        prefs = getSharedPreferences("gigi_report_status", MODE_PRIVATE);
++        setTitle("Gigi crash reports");
++        LinearLayout column = new LinearLayout(this);
++        column.setOrientation(LinearLayout.VERTICAL);
++        int pad = (int) (20 * getResources().getDisplayMetrics().density);
++        column.setPadding(pad, pad, pad, pad);
++        ScrollView scroll = new ScrollView(this);
++        scroll.addView(column);
++        setContentView(scroll);
++
++        TextView info = new TextView(this);
++        info.setText("Save a GitHub fine-grained token with Contents read and write on Gigimooshi2/GigiMorphs-logs. This sends the most recent accessible Reddit crash report and future reports to logs/reddit in that repository. Reports can include device details, stack traces and Morphe debug logs.");
++        column.addView(info);
++        input = new EditText(this);
++        input.setSingleLine(true);
++        input.setSaveEnabled(false);
++        input.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
++        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
++        input.setHint("GitHub token");
++        column.addView(input);
++        save = button(column, "Save and sync", v -> sync());
++        button(column, "Choose a saved crash report", v -> {
++            if (!enabled()) { message("Save a token first."); return; }
++            Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("text/*");
++            startActivityForResult(pick, PICK);
++        });
++        button(column, "Turn off uploads and forget token", v -> {
++            CrashReports.credential(this).delete();
++            getSystemService(JobScheduler.class).cancel(CrashReports.JOB);
++            input.setText("");
++            message("Uploads are off.");
++        });
++        status = new TextView(this);
++        column.addView(status);
++        refresh();
++    }
++
++    private boolean enabled() { return CrashReports.credential(this).getBaseFile().isFile(); }
++
++    private Button button(LinearLayout column, String label, View.OnClickListener listener) {
++        Button button = new Button(this);
++        button.setText(label);
++        button.setOnClickListener(listener);
++        column.addView(button);
++        return button;
++    }
++
++    private void sync() {
++        String supplied = input.getText().toString().trim();
++        try {
++            if (!supplied.isEmpty()) {
++                if (supplied.matches(".*\\s.*")) { message("Check the token for spaces."); return; }
++                CrashReports.save(CrashReports.credential(this), supplied.getBytes(StandardCharsets.UTF_8));
++                input.setText("");
++            }
++            if (!enabled()) { message("Enter a token first."); return; }
++        } catch (Exception e) { message("Could not save the token."); return; }
++        save.setEnabled(false);
++        io.execute(() -> {
++            try {
++                boolean existing = CrashReports.importLatest(this);
++                if (enabled()) {
++                    if (existing || CrashReports.pending(this).length > 0) {
++                        message("Report queued. Waiting for upload.");
++                        CrashReports.schedule(this);
++                    } else message("Ready for future crashes. You can also choose a saved report.");
++                }
++            } catch (Exception e) { message("Could not import automatically. Choose the saved crash report."); }
++            finally { runOnUiThread(() -> save.setEnabled(true)); }
++        });
++    }
++
++    @Override protected void onActivityResult(int request, int result, Intent data) {
++        super.onActivityResult(request, result, data);
++        if (request != PICK || result != RESULT_OK || data == null || data.getData() == null || !enabled()) return;
++        Uri uri = data.getData();
++        io.execute(() -> {
++            try (Cursor row = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
++                if (row == null || !row.moveToFirst()) { message("Could not open the file."); return; }
++                CrashReports.queue(this, row.getString(0), CrashReports.read(getContentResolver().openInputStream(uri)));
++                message("Report queued. Waiting for upload.");
++                CrashReports.schedule(this);
++            } catch (Exception e) { message("Could not queue the file. Choose crash_com.reddit.frontpage_…txt."); }
++        });
++    }
++
++    private void message(String text) { prefs.edit().putString("status", text).apply(); }
++    private void refresh() {
++        if (enabled()) input.setHint("Token saved • enter a new token to replace it");
++        else input.setHint("GitHub token");
++        status.setText(prefs.getString("status", "Uploads are off."));
++    }
++    @Override public void onSharedPreferenceChanged(SharedPreferences p, String key) { refresh(); }
++    @Override protected void onStart() { super.onStart(); prefs.registerOnSharedPreferenceChangeListener(this); refresh(); }
++    @Override protected void onStop() { prefs.unregisterOnSharedPreferenceChangeListener(this); super.onStop(); }
++    @Override protected void onDestroy() { io.shutdown(); super.onDestroy(); }
++}
+diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/UploadJob.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/UploadJob.java
+new file mode 100644
+index 00000000..ead9d4b3
+--- /dev/null
++++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/UploadJob.java
+@@ -0,0 +1,112 @@
++package app.morphe.extension.reddit.reports;
++
++import android.app.job.JobParameters;
++import android.app.job.JobService;
++import android.os.Handler;
++import android.os.Looper;
++import android.util.Base64;
++
++import org.json.JSONObject;
++
++import java.io.File;
++import java.io.IOException;
++import java.io.OutputStream;
++import java.net.HttpURLConnection;
++import java.net.URL;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.util.Arrays;
++
++public final class UploadJob extends JobService {
++    private Thread worker;
++
++    @Override public boolean onStartJob(JobParameters params) {
++        worker = new Thread(() -> {
++            Thread current = Thread.currentThread();
++            boolean retry = false;
++            try {
++                if (CrashReports.credential(this).getBaseFile().isFile()) {
++                    String token = new String(CrashReports.credential(this).readFully(), StandardCharsets.UTF_8);
++                    File[] files = CrashReports.pending(this);
++                    Arrays.sort(files);
++                    for (File f : files) {
++                        if (current.isInterrupted() || !CrashReports.credential(this).getBaseFile().isFile()) break;
++                        byte[] bytes = Files.readAllBytes(f.toPath());
++                        int code = upload(f.getName(), bytes, token);
++                        if (code != 201 && code != 200) {
++                            retry = code == 408 || code == 409 || code == 429 || code >= 500;
++                            status("GitHub returned HTTP " + code + ". " + (retry ? "Retry scheduled." : "Check the token and tap Save and sync."));
++                            break;
++                        }
++                        if (!f.delete() && f.exists()) throw new IOException("Could not clear the uploaded report");
++                        status("Uploaded " + f.getName().substring(0, f.getName().lastIndexOf('_')) + ".txt");
++                    }
++                }
++            } catch (Exception e) {
++                retry = true;
++                status("Upload interrupted. Retry scheduled.");
++            } finally {
++                boolean needsRetry = retry;
++                new Handler(Looper.getMainLooper()).post(() -> {
++                    if (worker == current) { worker = null; jobFinished(params, needsRetry); }
++                });
++            }
++        }, "Gigi crash uploads");
++        worker.start();
++        return true;
++    }
++
++    @Override public boolean onStopJob(JobParameters params) {
++        if (worker != null) worker.interrupt();
++        worker = null;
++        return true;
++    }
++
++    private void status(String message) {
++        getSharedPreferences("gigi_report_status", MODE_PRIVATE).edit().putString("status", message).apply();
++    }
++
++    private HttpURLConnection connect(URL url, String method, String token) throws IOException {
++        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
++        conn.setInstanceFollowRedirects(false);
++        conn.setConnectTimeout(10_000);
++        conn.setReadTimeout(20_000);
++        conn.setRequestMethod(method);
++        conn.setRequestProperty("Authorization", "Bearer " + token);
++        conn.setRequestProperty("User-Agent", "GigiMorphs-Reddit");
++        conn.setRequestProperty("Accept", "application/vnd.github+json");
++        conn.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
++        return conn;
++    }
++
++    private int upload(String name, byte[] data, String token) throws Exception {
++        URL url = new URL("https://api.github.com/repos/" + CrashReports.REPO + "/contents/logs/reddit/" + name);
++        HttpURLConnection put = connect(url, "PUT", token);
++        int code;
++        try {
++            byte[] body = new JSONObject().put("message", "Upload Reddit crash report")
++                    .put("content", Base64.encodeToString(data, Base64.NO_WRAP)).toString().getBytes(StandardCharsets.UTF_8);
++            put.setDoOutput(true);
++            put.setFixedLengthStreamingMode(body.length);
++            put.setRequestProperty("Content-Type", "application/json");
++            try (OutputStream out = put.getOutputStream()) { out.write(body); }
++            code = put.getResponseCode();
++            if (code == 403 && ("0".equals(put.getHeaderField("X-RateLimit-Remaining"))
++                    || put.getHeaderField("Retry-After") != null)) return 429;
++        } finally { put.disconnect(); }
++        if (code != 422) return code;
++        // The PUT may have committed before the phone lost its connection. Match the blob
++        // before acknowledging the retry, and never overwrite a different report.
++        HttpURLConnection get = connect(url, "GET", token);
++        try {
++            get.setRequestProperty("Accept", "application/vnd.github.object+json");
++            if (get.getResponseCode() == 200) {
++                try (java.util.Scanner response = new java.util.Scanner(get.getInputStream(), "UTF-8").useDelimiter("\\A")) {
++                    String sha = new JSONObject(response.next()).optString("sha");
++                    if (sha.equals(CrashReports.digest("SHA-1", data))) return 200;
++                }
++            }
++        } finally { get.disconnect(); }
++        return code;
++    }
++}
+diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/settings/preference/categories/MiscellaneousPreferenceCategory.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/settings/preference/categories/MiscellaneousPreferenceCategory.java
+index 24c79e91..9aedee01 100644
+--- a/extensions/reddit/src/main/java/app/morphe/extension/reddit/settings/preference/categories/MiscellaneousPreferenceCategory.java
++++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/settings/preference/categories/MiscellaneousPreferenceCategory.java
+@@ -10,6 +10,7 @@ package app.morphe.extension.reddit.settings.preference.categories;
+ import static app.morphe.extension.shared.StringRef.str;
+ 
+ import android.content.Context;
++import android.content.Intent;
+ import android.preference.Preference;
+ import android.preference.PreferenceScreen;
+ 
+@@ -24,6 +25,8 @@ import app.morphe.extension.reddit.patches.PrivateBrowsingModePatch;
+ import app.morphe.extension.reddit.patches.RedgifsAudioPatch;
+ import app.morphe.extension.reddit.patches.SanitizeSharingLinksPatch;
+ import app.morphe.extension.reddit.patches.SharePostContentPatch;
++import app.morphe.extension.reddit.reports.CrashReports;
++import app.morphe.extension.reddit.reports.ReportActivity;
+ import app.morphe.extension.reddit.settings.RedditActivityHook;
+ import app.morphe.extension.reddit.settings.Settings;
+ import app.morphe.extension.reddit.settings.preference.BooleanSettingPreference;
+@@ -49,7 +52,7 @@ public class MiscellaneousPreferenceCategory extends ConditionalPreferenceCatego
+ 
+     @Override
+     public boolean getSettingsStatus() {
+-        return AppIconPatch.isPatchIncluded() ||
++        return CrashReports.isPatchIncluded() || AppIconPatch.isPatchIncluded() ||
+                 DownloadAllFromGalleryPatch.isPatchIncluded() ||
+                 DownloadLocationPatch.isPatchIncluded() ||
+                 EnableDebuggingPatch.isPatchIncluded() ||
+@@ -65,6 +68,12 @@ public class MiscellaneousPreferenceCategory extends ConditionalPreferenceCatego
+     @Override
+     public void addPreferences(Context context) {
+         MorpheAboutPreference.showVancedAsPastContributor(false);
++        if (CrashReports.isPatchIncluded()) {
++            Preference reports = new Preference(context);
++            reports.setTitle("Gigi crash reports");
++            reports.setIntent(new Intent(context, ReportActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
++            addPreference(reports);
++        }
+         Preference about = new MorpheAboutPreference(context);
+         about.setTitle(str("morphe_about_title"));
+         about.setSummary(str("morphe_about_summary"));
 diff --git a/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4Permutation.java b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4Permutation.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..5dc5d09126e91ac28db06aff8996586d32043470
+index 00000000..5dc5d091
 --- /dev/null
 +++ b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4Permutation.java
 @@ -0,0 +1,8 @@
@@ -424,7 +879,7 @@ index 0000000000000000000000000000000000000000..5dc5d09126e91ac28db06aff8996586d
 +}
 diff --git a/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4s.java b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4s.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..6dc15ae60996072bd8115ee99f0f53150520daff
+index 00000000..6dc15ae6
 --- /dev/null
 +++ b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4s.java
 @@ -0,0 +1,8 @@
@@ -438,7 +893,7 @@ index 0000000000000000000000000000000000000000..6dc15ae60996072bd8115ee99f0f5315
 +}
 diff --git a/extensions/reddit/stub/src/main/java/com/reddit/domain/model/VideoUrls.java b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/VideoUrls.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..18cc841a94d77a5c66f73aebb9eb0f428262bb7a
+index 00000000..18cc841a
 --- /dev/null
 +++ b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/VideoUrls.java
 @@ -0,0 +1,6 @@
@@ -449,7 +904,7 @@ index 0000000000000000000000000000000000000000..18cc841a94d77a5c66f73aebb9eb0f42
 +    public native String getLocalUri();
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/BackgroundPlaybackPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/BackgroundPlaybackPatch.java
-index a7df9648890c6cc2cc2faa884ecad5f8e450f404..61027d921b82e76a7cf62fcbe5bf3d15c439630c 100644
+index a7df9648..61027d92 100644
 --- a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/BackgroundPlaybackPatch.java
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/BackgroundPlaybackPatch.java
 @@ -195,15 +195,41 @@ public class BackgroundPlaybackPatch {
@@ -497,7 +952,7 @@ index a7df9648890c6cc2cc2faa884ecad5f8e450f404..61027d921b82e76a7cf62fcbe5bf3d15
       */
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiDontRecommendChannelPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiDontRecommendChannelPatch.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..15923d0946f5b10e4a3acdc8d2634bbb9e24437a
+index 00000000..15923d09
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiDontRecommendChannelPatch.java
 @@ -0,0 +1,265 @@
@@ -768,7 +1223,7 @@ index 0000000000000000000000000000000000000000..15923d0946f5b10e4a3acdc8d2634bbb
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckInfoPreference.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckInfoPreference.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..5fcbde14b039586c2c00d2badc2f10df7afced92
+index 00000000..5fcbde14
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckInfoPreference.java
 @@ -0,0 +1,27 @@
@@ -801,7 +1256,7 @@ index 0000000000000000000000000000000000000000..5fcbde14b039586c2c00d2badc2f10df
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckPatch.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0f81acbed523280f5d9af939fc51f653f8be4a8d
+index 00000000..0f81acbe
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiFactCheckPatch.java
 @@ -0,0 +1,948 @@
@@ -1755,7 +2210,7 @@ index 0000000000000000000000000000000000000000..0f81acbed523280f5d9af939fc51f653
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..9d02bfd8839625690e27857131ddc20b991879d4
+index 00000000..9d02bfd8
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiLogUploadPatch.java
 @@ -0,0 +1,316 @@
@@ -2077,7 +2532,7 @@ index 0000000000000000000000000000000000000000..9d02bfd8839625690e27857131ddc20b
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..6f33f874f27e8bb3a1c6cda4e34e6793215437f6
+index 00000000..6f33f874
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiShortsFullVideoLinkPatch.java
 @@ -0,0 +1,96 @@
@@ -2179,7 +2634,7 @@ index 0000000000000000000000000000000000000000..6f33f874f27e8bb3a1c6cda4e34e6793
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUnplayableFallbackPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUnplayableFallbackPatch.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..6de167d3485ba867dfc0d791ab0014ace95ed46e
+index 00000000..6de167d3
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUnplayableFallbackPatch.java
 @@ -0,0 +1,198 @@
@@ -2383,7 +2838,7 @@ index 0000000000000000000000000000000000000000..6de167d3485ba867dfc0d791ab0014ac
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUploadLogsPreference.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUploadLogsPreference.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..c0bb4351dc3e34b7bfac4cdeed3529dc3dfc2fa0
+index 00000000..c0bb4351
 --- /dev/null
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/GigiUploadLogsPreference.java
 @@ -0,0 +1,35 @@
@@ -2423,7 +2878,7 @@ index 0000000000000000000000000000000000000000..c0bb4351dc3e34b7bfac4cdeed3529dc
 +    }
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
-index c3ee047de2051a4683283fa3f0b1bfb4fd039a04..0bb49e370d25af1aec7cefc3021e271e29b2b665 100644
+index c3ee047d..0bb49e37 100644
 --- a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
 @@ -1058,6 +1058,26 @@ public final class FlyoutUtils {
@@ -2455,7 +2910,7 @@ index c3ee047de2051a4683283fa3f0b1bfb4fd039a04..0bb49e370d25af1aec7cefc3021e271e
                      flyoutPanel,
 diff --git a/extensions/youtube/src/main/proto/app/morphe/extension/youtube/innertube/gigi_fact_check.proto b/extensions/youtube/src/main/proto/app/morphe/extension/youtube/innertube/gigi_fact_check.proto
 new file mode 100644
-index 0000000000000000000000000000000000000000..504ca63350cda462c24584df559545ffc656da6f
+index 00000000..504ca633
 --- /dev/null
 +++ b/extensions/youtube/src/main/proto/app/morphe/extension/youtube/innertube/gigi_fact_check.proto
 @@ -0,0 +1,55 @@
@@ -2515,7 +2970,7 @@ index 0000000000000000000000000000000000000000..504ca63350cda462c24584df559545ff
 +    optional string author = 33;
 +}
 diff --git a/patches/build.gradle.kts b/patches/build.gradle.kts
-index f6d87276332afaf15b0cbaa56eba70d685d2648a..7992838acdbef64c48e270c1c6b88eb1443df500 100644
+index f6d87276..7992838a 100644
 --- a/patches/build.gradle.kts
 +++ b/patches/build.gradle.kts
 @@ -10,12 +10,12 @@ group = "app.morphe"
@@ -2538,10 +2993,10 @@ index f6d87276332afaf15b0cbaa56eba70d685d2648a..7992838acdbef64c48e270c1c6b88eb1
  }
 diff --git a/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt b/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..958423369a2c786033af444308569b8942bf43ea
+index 00000000..09ab6ec0
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,247 @@
 +package app.morphe.patches.reddit.gigi
 +
 +import app.morphe.patcher.Fingerprint
@@ -2552,6 +3007,9 @@ index 0000000000000000000000000000000000000000..958423369a2c786033af444308569b89
 +import app.morphe.patcher.patch.Compatibility
 +import app.morphe.patcher.patch.mutableClassDefBy
 +import app.morphe.patcher.patch.patch
++import app.morphe.patcher.patch.resourceXml
++import app.morphe.patches.reddit.misc.settings.settingsPatch
++import app.morphe.util.setExtensionIsPatchIncluded
 +import app.morphe.patcher.string
 +import app.morphe.patches.reddit.misc.extension.sharedExtensionPatch
 +import app.morphe.patches.reddit.shared.Constants.COMPATIBILITY_REDDIT
@@ -2742,9 +3200,53 @@ index 0000000000000000000000000000000000000000..958423369a2c786033af444308569b89
 +        }
 +    }
 +}
++
++private const val REPORT_PACKAGE = "app.morphe.extension.reddit.reports"
++private const val REPORT_QUEUE = "Lapp/morphe/extension/reddit/reports/CrashReports;"
++
++val gigiCrashUploadPatch = patch(
++    name = "Gigi crash report upload",
++    description = "Adds a crash reports launcher and an option to send Reddit crash reports to the private GigiMorphs logs repository."
++) {
++    compatibleWith(target)
++    dependsOn(settingsPatch)
++    execute {
++        setExtensionIsPatchIncluded(REPORT_QUEUE)
++        val logger = mutableClassDefBy("Lapp/morphe/extension/shared/patches/CrashLogPatch;")
++        // On every supported Android version Morphe passes the finished report here,
++        // including when its public write subsequently falls back to app-specific storage.
++        logger.methods.single { it.name == "writeToMediaStoreDocuments" }.addInstructions(
++            0, "invoke-static/range { p0 .. p2 }, $REPORT_QUEUE->capture(Landroid/content/Context;Ljava/lang/String;[B)V"
++        )
++        logger.methods.single { it.name == "setUncaughtExceptionHandler" }.addInstructions(
++            0, "invoke-static/range { p0 .. p0 }, $REPORT_QUEUE->resume(Landroid/content/Context;)V"
++        )
++        resourceXml("AndroidManifest.xml").use { manifest ->
++            val app = manifest.elements("application").single()
++            app.appendChild("activity") {
++                setAttribute("android:name", "$REPORT_PACKAGE.ReportActivity")
++                setAttribute("android:label", "Gigi crash reports")
++                setAttribute("android:exported", "true")
++                setAttribute("android:process", ":gigi_reports")
++                setAttribute("android:taskAffinity", "com.reddit.frontpage.gigi_reports")
++                setAttribute("android:theme", "@android:style/Theme.Material.Light")
++                appendChild("intent-filter") {
++                    appendChild("action") { setAttribute("android:name", "android.intent.action.MAIN") }
++                    appendChild("category") { setAttribute("android:name", "android.intent.category.LAUNCHER") }
++                }
++            }
++            app.appendChild("service") {
++                setAttribute("android:name", "$REPORT_PACKAGE.UploadJob")
++                setAttribute("android:exported", "false")
++                setAttribute("android:permission", "android.permission.BIND_JOB_SERVICE")
++                setAttribute("android:process", ":gigi_reports")
++            }
++        }
++    }
++}
 diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/interaction/gigifactcheck/GigiFactCheckPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/interaction/gigifactcheck/GigiFactCheckPatch.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..11948f8ccc756a59c40d4bc362d97a73580a2506
+index 00000000..11948f8c
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/youtube/interaction/gigifactcheck/GigiFactCheckPatch.kt
 @@ -0,0 +1,98 @@
@@ -2848,7 +3350,7 @@ index 0000000000000000000000000000000000000000..11948f8ccc756a59c40d4bc362d97a73
 +}
 diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/layout/flyout/GigiDontRecommendChannelPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/layout/flyout/GigiDontRecommendChannelPatch.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..e034c95d5af744c93e0ad5fd973da99dcc617f6d
+index 00000000..e034c95d
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/youtube/layout/flyout/GigiDontRecommendChannelPatch.kt
 @@ -0,0 +1,30 @@
@@ -2884,7 +3386,7 @@ index 0000000000000000000000000000000000000000..e034c95d5af744c93e0ad5fd973da99d
 +}
 diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/layout/shortsplayer/GigiShortsFullVideoLinkPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/layout/shortsplayer/GigiShortsFullVideoLinkPatch.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..7099b32b8c3f2efff9414966b8bc6bfd4c6c8298
+index 00000000..7099b32b
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/youtube/layout/shortsplayer/GigiShortsFullVideoLinkPatch.kt
 @@ -0,0 +1,34 @@
@@ -2924,7 +3426,7 @@ index 0000000000000000000000000000000000000000..7099b32b8c3f2efff9414966b8bc6bfd
 +}
 diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/misc/gigilogs/GigiLogUploadPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/misc/gigilogs/GigiLogUploadPatch.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..94abdf489c569ab03bbfbf9fa8c2d7fa09204505
+index 00000000..94abdf48
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/youtube/misc/gigilogs/GigiLogUploadPatch.kt
 @@ -0,0 +1,56 @@
@@ -2986,7 +3488,7 @@ index 0000000000000000000000000000000000000000..94abdf489c569ab03bbfbf9fa8c2d7fa
 +}
 diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/misc/spoof/GigiUnplayableFallbackPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/misc/spoof/GigiUnplayableFallbackPatch.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..cbca8525aa5657b386101aede90556a8bbb4c155
+index 00000000..cbca8525
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/youtube/misc/spoof/GigiUnplayableFallbackPatch.kt
 @@ -0,0 +1,188 @@
@@ -3179,7 +3681,7 @@ index 0000000000000000000000000000000000000000..cbca8525aa5657b386101aede90556a8
 +    }
 +}
 diff --git a/patches/src/main/resources/addresources/values/youtube/strings.xml b/patches/src/main/resources/addresources/values/youtube/strings.xml
-index 3bcf17b5399ec9ba8d142ae6871a50aa86a68295..b1a90760c9483e2b8a5da8b88b170ba94e32b9c1 100644
+index 3bcf17b5..b1a90760 100644
 --- a/patches/src/main/resources/addresources/values/youtube/strings.xml
 +++ b/patches/src/main/resources/addresources/values/youtube/strings.xml
 @@ -15,6 +15,30 @@ Second \"item\" text"</string>
@@ -3215,7 +3717,7 @@ index 3bcf17b5399ec9ba8d142ae6871a50aa86a68295..b1a90760c9483e2b8a5da8b88b170ba9
      <!-- In languages where "About" is ambiguous, translate this as "About Morphe" (i.e., About this app). -->
 diff --git a/patches/src/main/resources/gigifactcheck/drawable/gigi_yt_fact_check.xml b/patches/src/main/resources/gigifactcheck/drawable/gigi_yt_fact_check.xml
 new file mode 100644
-index 0000000000000000000000000000000000000000..42a70fa5e34e262602fa15f7b0d2995008196bbc
+index 00000000..42a70fa5
 --- /dev/null
 +++ b/patches/src/main/resources/gigifactcheck/drawable/gigi_yt_fact_check.xml
 @@ -0,0 +1,25 @@

@@ -198,6 +198,7 @@ public final class GigiNavigation implements Application.ActivityLifecycleCallba
     }
 
     @Override public void onActivityResumed(Activity activity) {
+        if (activity instanceof app.morphe.extension.reddit.reports.ReportActivity) return;
         FrameLayout decor = (FrameLayout) activity.getWindow().getDecorView();
         for (int i = 0; i < decor.getChildCount(); i++) {
             if (decor.getChildAt(i) instanceof Controls) return;
