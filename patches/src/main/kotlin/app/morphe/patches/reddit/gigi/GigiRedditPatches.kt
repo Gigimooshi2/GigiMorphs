@@ -3,6 +3,7 @@ package app.morphe.patches.reddit.gigi
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.methodCall
+import app.morphe.patcher.util.registersUsed
 import app.morphe.patcher.patch.AppTarget
 import app.morphe.patcher.patch.Compatibility
 import app.morphe.patcher.patch.mutableClassDefBy
@@ -122,5 +123,78 @@ val gigiNavigationPatch = patch(
         ApplicationCreate.method.addInstructions(0, """
             invoke-static/range { p0 .. p0 }, $HISTORY->install(Landroid/app/Application;)V
         """)
+    }
+}
+
+private const val CONTROLS = "Lapp/morphe/extension/reddit/patches/GigiPlayerControls;"
+private const val MODEL = "Lcom/reddit/exokit/internal/ui/b;"
+private const val RENDERER = "Lcom/reddit/exokit/api/ui/b;"
+private const val PLAYER = "Leci;"
+private const val FUNCTION = "Lkotlin/jvm/functions/Function1;"
+
+private object VideoBox : Fingerprint(
+    definingClass = RENDERER, name = "c", returnType = "V",
+    filters = listOf(methodCall(definingClass = RENDERER, name = "a"),
+                     methodCall(definingClass = RENDERER, name = "b"))
+)
+
+val gigiPlayerControlsPatch = patch(
+    name = "Gigi video controls",
+    description = "Adds play, pause, a scrubber and ten-second skips directly to Reddit video surfaces."
+) {
+    compatibleWith(target)
+    dependsOn(sharedExtensionPatch)
+    execute {
+        // Each branch emits one video surface in a Compose Box. Add our controls inside the
+        // same Box, bound to that surface's model. Recycled feed cells receive a new binding.
+        VideoBox.instructionMatches.asReversed().forEach { call ->
+            val regs = call.instruction.registersUsed
+            VideoBox.method.addInstructions(call.index + 1,
+                "invoke-static { v${regs[0]}, v${regs[3]} }, $CONTROLS->draw(Ljava/lang/Object;Ljava/lang/Object;)V")
+        }
+        mutableClassDefBy(CONTROLS).methods.apply {
+            first { it.name == "compose" }.addInstructions(0, """
+                check-cast p1, Ljax;
+                check-cast p3, Li7c;
+                invoke-static/range { p0 .. p5 }, Landroidx/compose/ui/viewinterop/d;->a(${FUNCTION}Ljax;${FUNCTION}Li7c;II)V
+                return-void
+            """)
+            first { it.name == "player" }.addInstructions(0, """
+                check-cast p0, $MODEL
+                iget-object p0, p0, ${MODEL}->q:Lcom/reddit/exokit/internal/data/coordinator/a;
+                if-eqz p0, :done
+                iget-object p0, p0, Lcom/reddit/exokit/internal/data/coordinator/a;->e:Lcom/reddit/exokit/internal/data/a;
+                iget-object p0, p0, Lcom/reddit/exokit/internal/data/a;->a:Landroidx/media3/exoplayer/ExoPlayer;
+                check-cast p0, $PLAYER
+                :done
+                return-object p0
+            """)
+            for ((name, getter) in listOf("position" to "h", "duration" to "l")) {
+                first { it.name == name }.addInstructions(0, """
+                    check-cast p0, $PLAYER
+                    invoke-virtual { p0 }, ${PLAYER}->${getter}()J
+                    move-result-wide v0
+                    return-wide v0
+                """)
+            }
+            first { it.name == "wantsPlay" }.addInstructions(0, """
+                check-cast p0, $PLAYER
+                invoke-virtual { p0 }, ${PLAYER}->m()Z
+                move-result p0
+                return p0
+            """)
+            first { it.name == "play" }.addInstructions(0, """
+                check-cast p0, $PLAYER
+                invoke-virtual { p0, p1 }, ${PLAYER}->B(Z)V
+                return-void
+            """)
+            first { it.name == "seek" }.addInstructions(0, """
+                check-cast p0, $PLAYER
+                invoke-virtual { p0 }, ${PLAYER}->f()I
+                move-result p3
+                invoke-virtual { p0, p3, p1, p2 }, ${PLAYER}->y(IJ)V
+                return-void
+            """)
+        }
     }
 }

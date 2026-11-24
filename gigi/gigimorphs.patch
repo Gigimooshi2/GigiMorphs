@@ -236,6 +236,140 @@ index 00000000..761cd3e6
 +    @Override public void onActivityStopped(Activity a) { }
 +    @Override public void onActivitySaveInstanceState(Activity a, Bundle s) { }
 +}
+diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiPlayerControls.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiPlayerControls.java
+new file mode 100644
+index 00000000..0b8c3011
+--- /dev/null
++++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiPlayerControls.java
+@@ -0,0 +1,128 @@
++package app.morphe.extension.reddit.patches;
++
++import android.content.Context;
++import android.graphics.Color;
++import android.graphics.drawable.GradientDrawable;
++import android.view.Gravity;
++import android.view.View;
++import android.widget.Button;
++import android.widget.LinearLayout;
++import android.widget.SeekBar;
++
++import kotlin.jvm.functions.Function1;
++
++@SuppressWarnings("unused")
++public final class GigiPlayerControls extends LinearLayout {
++    private static final Function1<Context, View> FACTORY = GigiPlayerControls::new;
++    private final Button playButton;
++    private final SeekBar scrubber;
++    private Object model;
++    private Object dragPlayer;
++    private final Runnable tick = this::refresh;
++
++    public static void draw(Object model, Object composer) {
++        Function1<View, Object> update = view -> {
++            GigiPlayerControls controls = (GigiPlayerControls) view;
++            if (controls.model != model) {
++                controls.model = model;
++                controls.dragPlayer = null;
++                controls.refresh();
++            }
++            return null; // AndroidView ignores the callback result.
++        };
++        compose(FACTORY, null, update, composer, 0, 2);
++    }
++
++    // The Kotlin patch supplies the app's Compose AndroidView and Media3 bindings.
++    private static void compose(Function1<?, ?> factory, Object modifier, Function1<?, ?> update,
++                                Object composer, int flags, int defaults) {}
++    private static Object player(Object model) { return null; }
++    private static long position(Object p) { return -1L; }
++    private static long duration(Object p) { return -1L; }
++    private static boolean wantsPlay(Object p) { return false; }
++    private static void play(Object p, boolean value) {}
++    private static void seek(Object p, long millis, int currentItem) {}
++
++    private GigiPlayerControls(Context context) {
++        super(context);
++        setOrientation(HORIZONTAL);
++        setGravity(Gravity.CENTER_VERTICAL);
++        GradientDrawable bg = new GradientDrawable();
++        bg.setColor(0xbb202020);
++        bg.setCornerRadius(dp(16));
++        setBackground(bg);
++        button("−10", "Back ten seconds").setOnClickListener(v -> skip(-10000));
++        playButton = button("▶", "Play");
++        playButton.setOnClickListener(v -> {
++            Object p = current();
++            if (p != null) play(p, !wantsPlay(p));
++            refresh();
++        });
++        button("+10", "Forward ten seconds").setOnClickListener(v -> skip(10000));
++        scrubber = new SeekBar(context);
++        scrubber.setContentDescription("Video position");
++        scrubber.setMax(1000);
++        addView(scrubber, new LayoutParams(dp(92), dp(44)));
++        scrubber.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
++            @Override public void onStartTrackingTouch(SeekBar bar) { dragPlayer = current(); }
++            @Override public void onStopTrackingTouch(SeekBar bar) {
++                Object p = current();
++                if (p != null && p == dragPlayer && duration(p) > 0) {
++                    seek(p, duration(p) * bar.getProgress() / bar.getMax(), 0);
++                }
++                dragPlayer = null;
++                refresh();
++            }
++            @Override public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {}
++        });
++    }
++
++    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
++    private Object current() { return model == null ? null : player(model); }
++
++    private Button button(String text, String label) {
++        Button b = new Button(getContext(), null, android.R.attr.borderlessButtonStyle);
++        b.setText(text);
++        b.setTextColor(Color.WHITE);
++        b.setTextSize(13);
++        b.setPadding(0, 0, 0, 0);
++        b.setContentDescription(label);
++        addView(b, new LayoutParams(dp(48), dp(48)));
++        return b;
++    }
++
++    private void skip(long delta) {
++        Object p = current();
++        if (p == null || duration(p) <= 0) return;
++        seek(p, Math.max(0, Math.min(duration(p), position(p) + delta)), 0);
++        refresh();
++    }
++
++    private void refresh() {
++        removeCallbacks(tick);
++        if (!isAttachedToWindow() || getWindowVisibility() != VISIBLE) return;
++        Object p = current();
++        long length = p == null ? 0 : duration(p);
++        boolean playing = p != null && wantsPlay(p);
++        String label = playing ? "Pause" : "Play";
++        if (!label.contentEquals(playButton.getContentDescription())) {
++            playButton.setText(playing ? "Ⅱ" : "▶");
++            playButton.setContentDescription(label);
++        }
++        playButton.setEnabled(p != null);
++        scrubber.setEnabled(length > 0);
++        if (dragPlayer == null) scrubber.setProgress(length <= 0 ? 0 : (int)(position(p) * 1000 / length));
++        postDelayed(tick, 500);
++    }
++
++    @Override protected void onAttachedToWindow() { super.onAttachedToWindow(); post(tick); }
++    @Override protected void onDetachedFromWindow() {
++        removeCallbacks(tick);
++        dragPlayer = null;
++        super.onDetachedFromWindow();
++    }
++    @Override protected void onWindowVisibilityChanged(int visibility) {
++        super.onWindowVisibilityChanged(visibility);
++        if (tick != null && visibility == VISIBLE) post(tick);
++    }
++}
 diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiVideo.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiVideo.java
 new file mode 100644
 index 00000000..c4091d33
@@ -2404,15 +2538,16 @@ index 6f3a1f07..ee88e1d1 100644
  }
 diff --git a/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt b/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt
 new file mode 100644
-index 00000000..5856c8a4
+index 00000000..95842336
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,200 @@
 +package app.morphe.patches.reddit.gigi
 +
 +import app.morphe.patcher.Fingerprint
 +import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 +import app.morphe.patcher.methodCall
++import app.morphe.patcher.util.registersUsed
 +import app.morphe.patcher.patch.AppTarget
 +import app.morphe.patcher.patch.Compatibility
 +import app.morphe.patcher.patch.mutableClassDefBy
@@ -2532,6 +2667,79 @@ index 00000000..5856c8a4
 +        ApplicationCreate.method.addInstructions(0, """
 +            invoke-static/range { p0 .. p0 }, $HISTORY->install(Landroid/app/Application;)V
 +        """)
++    }
++}
++
++private const val CONTROLS = "Lapp/morphe/extension/reddit/patches/GigiPlayerControls;"
++private const val MODEL = "Lcom/reddit/exokit/internal/ui/b;"
++private const val RENDERER = "Lcom/reddit/exokit/api/ui/b;"
++private const val PLAYER = "Leci;"
++private const val FUNCTION = "Lkotlin/jvm/functions/Function1;"
++
++private object VideoBox : Fingerprint(
++    definingClass = RENDERER, name = "c", returnType = "V",
++    filters = listOf(methodCall(definingClass = RENDERER, name = "a"),
++                     methodCall(definingClass = RENDERER, name = "b"))
++)
++
++val gigiPlayerControlsPatch = patch(
++    name = "Gigi video controls",
++    description = "Adds play, pause, a scrubber and ten-second skips directly to Reddit video surfaces."
++) {
++    compatibleWith(target)
++    dependsOn(sharedExtensionPatch)
++    execute {
++        // Each branch emits one video surface in a Compose Box. Add our controls inside the
++        // same Box, bound to that surface's model. Recycled feed cells receive a new binding.
++        VideoBox.instructionMatches.asReversed().forEach { call ->
++            val regs = call.instruction.registersUsed
++            VideoBox.method.addInstructions(call.index + 1,
++                "invoke-static { v${regs[0]}, v${regs[3]} }, $CONTROLS->draw(Ljava/lang/Object;Ljava/lang/Object;)V")
++        }
++        mutableClassDefBy(CONTROLS).methods.apply {
++            first { it.name == "compose" }.addInstructions(0, """
++                check-cast p1, Ljax;
++                check-cast p3, Li7c;
++                invoke-static/range { p0 .. p5 }, Landroidx/compose/ui/viewinterop/d;->a(${FUNCTION}Ljax;${FUNCTION}Li7c;II)V
++                return-void
++            """)
++            first { it.name == "player" }.addInstructions(0, """
++                check-cast p0, $MODEL
++                iget-object p0, p0, ${MODEL}->q:Lcom/reddit/exokit/internal/data/coordinator/a;
++                if-eqz p0, :done
++                iget-object p0, p0, Lcom/reddit/exokit/internal/data/coordinator/a;->e:Lcom/reddit/exokit/internal/data/a;
++                iget-object p0, p0, Lcom/reddit/exokit/internal/data/a;->a:Landroidx/media3/exoplayer/ExoPlayer;
++                check-cast p0, $PLAYER
++                :done
++                return-object p0
++            """)
++            for ((name, getter) in listOf("position" to "h", "duration" to "l")) {
++                first { it.name == name }.addInstructions(0, """
++                    check-cast p0, $PLAYER
++                    invoke-virtual { p0 }, ${PLAYER}->${getter}()J
++                    move-result-wide v0
++                    return-wide v0
++                """)
++            }
++            first { it.name == "wantsPlay" }.addInstructions(0, """
++                check-cast p0, $PLAYER
++                invoke-virtual { p0 }, ${PLAYER}->m()Z
++                move-result p0
++                return p0
++            """)
++            first { it.name == "play" }.addInstructions(0, """
++                check-cast p0, $PLAYER
++                invoke-virtual { p0, p1 }, ${PLAYER}->B(Z)V
++                return-void
++            """)
++            first { it.name == "seek" }.addInstructions(0, """
++                check-cast p0, $PLAYER
++                invoke-virtual { p0 }, ${PLAYER}->f()I
++                move-result p3
++                invoke-virtual { p0, p3, p1, p2 }, ${PLAYER}->y(IJ)V
++                return-void
++            """)
++        }
 +    }
 +}
 diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/interaction/gigifactcheck/GigiFactCheckPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/interaction/gigifactcheck/GigiFactCheckPatch.kt
