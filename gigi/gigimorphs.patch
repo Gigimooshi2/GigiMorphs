@@ -239,10 +239,10 @@ index 00000000..46af659a
 +}
 diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiPlayerControls.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiPlayerControls.java
 new file mode 100644
-index 00000000..0b8c3011
+index 00000000..af5daaf6
 --- /dev/null
 +++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiPlayerControls.java
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,143 @@
 +package app.morphe.extension.reddit.patches;
 +
 +import android.content.Context;
@@ -258,24 +258,39 @@ index 00000000..0b8c3011
 +
 +@SuppressWarnings("unused")
 +public final class GigiPlayerControls extends LinearLayout {
-+    private static final Function1<Context, View> FACTORY = GigiPlayerControls::new;
++    // Keep concrete erased invoke(Object) methods in the extension DEX. The call sites
++    // live in Reddit's Compose code, outside the extension shrinker's call graph.
++    private static final class Factory implements Function1<Object, Object> {
++        @Override public Object invoke(Object context) {
++            return new GigiPlayerControls((Context) context);
++        }
++    }
++
++    private static final Factory FACTORY = new Factory();
 +    private final Button playButton;
 +    private final SeekBar scrubber;
 +    private Object model;
 +    private Object dragPlayer;
 +    private final Runnable tick = this::refresh;
 +
-+    public static void draw(Object model, Object composer) {
-+        Function1<View, Object> update = view -> {
++    private static final class Update implements Function1<Object, Object> {
++        private final Object model;
++
++        Update(Object model) { this.model = model; }
++
++        @Override public Object invoke(Object view) {
 +            GigiPlayerControls controls = (GigiPlayerControls) view;
 +            if (controls.model != model) {
 +                controls.model = model;
 +                controls.dragPlayer = null;
 +                controls.refresh();
 +            }
-+            return null; // AndroidView ignores the callback result.
-+        };
-+        compose(FACTORY, null, update, composer, 0, 2);
++            return null;
++        }
++    }
++
++    public static void draw(Object model, Object composer) {
++        compose(FACTORY, null, new Update(model), composer, 0, 2);
 +    }
 +
 +    // The Kotlin patch supplies the app's Compose AndroidView and Media3 bindings.
@@ -701,6 +716,27 @@ index 00000000..ac512514
 +    @Override protected void onStart() { super.onStart(); prefs.registerOnSharedPreferenceChangeListener(this); refresh(); }
 +    @Override protected void onStop() { prefs.unregisterOnSharedPreferenceChangeListener(this); super.onStop(); }
 +    @Override protected void onDestroy() { io.shutdown(); super.onDestroy(); }
++}
+diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/ReportComponentFactory.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/ReportComponentFactory.java
+new file mode 100644
+index 00000000..23ae7a78
+--- /dev/null
++++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/ReportComponentFactory.java
+@@ -0,0 +1,15 @@
++package app.morphe.extension.reddit.reports;
++
++import android.app.Application;
++
++import androidx.core.app.CoreComponentFactory;
++
++public final class ReportComponentFactory extends CoreComponentFactory {
++    @Override public Application instantiateApplication(ClassLoader loader, String name)
++            throws InstantiationException, IllegalAccessException, ClassNotFoundException {
++        // Reddit only initializes its dependency graph in its own processes. Its memory
++        // callbacks dereference that graph even in processes where it was never initialized.
++        if (Application.getProcessName().endsWith(":gigi_reports")) return new Application();
++        return super.instantiateApplication(loader, name);
++    }
 +}
 diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/UploadJob.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/reports/UploadJob.java
 new file mode 100644
@@ -2993,10 +3029,10 @@ index f6d87276..7992838a 100644
  }
 diff --git a/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt b/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt
 new file mode 100644
-index 00000000..09ab6ec0
+index 00000000..6ed90d81
 --- /dev/null
 +++ b/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt
-@@ -0,0 +1,247 @@
+@@ -0,0 +1,252 @@
 +package app.morphe.patches.reddit.gigi
 +
 +import app.morphe.patcher.Fingerprint
@@ -3166,6 +3202,7 @@ index 00000000..09ab6ec0
 +                iget-object p0, p0, ${MODEL}->q:Lcom/reddit/exokit/internal/data/coordinator/a;
 +                if-eqz p0, :done
 +                iget-object p0, p0, Lcom/reddit/exokit/internal/data/coordinator/a;->e:Lcom/reddit/exokit/internal/data/a;
++                if-eqz p0, :done
 +                iget-object p0, p0, Lcom/reddit/exokit/internal/data/a;->a:Landroidx/media3/exoplayer/ExoPlayer;
 +                check-cast p0, $PLAYER
 +                :done
@@ -3223,6 +3260,10 @@ index 00000000..09ab6ec0
 +        )
 +        resourceXml("AndroidManifest.xml").use { manifest ->
 +            val app = manifest.elements("application").single()
++            check(app.attribute("android:appComponentFactory") == "androidx.core.app.CoreComponentFactory") {
++                "Unexpected Reddit component factory"
++            }
++            app.setAttribute("android:appComponentFactory", "$REPORT_PACKAGE.ReportComponentFactory")
 +            app.appendChild("activity") {
 +                setAttribute("android:name", "$REPORT_PACKAGE.ReportActivity")
 +                setAttribute("android:label", "Gigi crash reports")

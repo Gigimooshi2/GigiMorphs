@@ -13,24 +13,39 @@ import kotlin.jvm.functions.Function1;
 
 @SuppressWarnings("unused")
 public final class GigiPlayerControls extends LinearLayout {
-    private static final Function1<Context, View> FACTORY = GigiPlayerControls::new;
+    // Keep concrete erased invoke(Object) methods in the extension DEX. The call sites
+    // live in Reddit's Compose code, outside the extension shrinker's call graph.
+    private static final class Factory implements Function1<Object, Object> {
+        @Override public Object invoke(Object context) {
+            return new GigiPlayerControls((Context) context);
+        }
+    }
+
+    private static final Factory FACTORY = new Factory();
     private final Button playButton;
     private final SeekBar scrubber;
     private Object model;
     private Object dragPlayer;
     private final Runnable tick = this::refresh;
 
-    public static void draw(Object model, Object composer) {
-        Function1<View, Object> update = view -> {
+    private static final class Update implements Function1<Object, Object> {
+        private final Object model;
+
+        Update(Object model) { this.model = model; }
+
+        @Override public Object invoke(Object view) {
             GigiPlayerControls controls = (GigiPlayerControls) view;
             if (controls.model != model) {
                 controls.model = model;
                 controls.dragPlayer = null;
                 controls.refresh();
             }
-            return null; // AndroidView ignores the callback result.
-        };
-        compose(FACTORY, null, update, composer, 0, 2);
+            return null;
+        }
+    }
+
+    public static void draw(Object model, Object composer) {
+        compose(FACTORY, null, new Update(model), composer, 0, 2);
     }
 
     // The Kotlin patch supplies the app's Compose AndroidView and Media3 bindings.

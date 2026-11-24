@@ -167,6 +167,7 @@ val gigiPlayerControlsPatch = patch(
                 iget-object p0, p0, ${MODEL}->q:Lcom/reddit/exokit/internal/data/coordinator/a;
                 if-eqz p0, :done
                 iget-object p0, p0, Lcom/reddit/exokit/internal/data/coordinator/a;->e:Lcom/reddit/exokit/internal/data/a;
+                if-eqz p0, :done
                 iget-object p0, p0, Lcom/reddit/exokit/internal/data/a;->a:Landroidx/media3/exoplayer/ExoPlayer;
                 check-cast p0, $PLAYER
                 :done
@@ -224,6 +225,10 @@ val gigiCrashUploadPatch = patch(
         )
         resourceXml("AndroidManifest.xml").use { manifest ->
             val app = manifest.elements("application").single()
+            check(app.attribute("android:appComponentFactory") == "androidx.core.app.CoreComponentFactory") {
+                "Unexpected Reddit component factory"
+            }
+            app.setAttribute("android:appComponentFactory", "$REPORT_PACKAGE.ReportComponentFactory")
             app.appendChild("activity") {
                 setAttribute("android:name", "$REPORT_PACKAGE.ReportActivity")
                 setAttribute("android:label", "Gigi crash reports")
