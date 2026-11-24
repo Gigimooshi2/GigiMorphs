@@ -1,3 +1,319 @@
+diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiNavigation.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiNavigation.java
+new file mode 100644
+index 00000000..761cd3e6
+--- /dev/null
++++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiNavigation.java
+@@ -0,0 +1,232 @@
++package app.morphe.extension.reddit.patches;
++
++import android.app.Activity;
++import android.app.Application;
++import android.content.ComponentName;
++import android.content.Intent;
++import android.graphics.Color;
++import android.graphics.drawable.GradientDrawable;
++import android.os.Bundle;
++import android.os.SystemClock;
++import android.view.Gravity;
++import android.view.View;
++import android.view.ViewGroup;
++import android.widget.Button;
++import android.widget.FrameLayout;
++import android.widget.LinearLayout;
++
++import java.lang.ref.WeakReference;
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.Map;
++
++@SuppressWarnings({"unused", "deprecation"})
++public final class GigiNavigation implements Application.ActivityLifecycleCallbacks {
++    private static final String MAIN = "com.reddit.launch.main.MainActivity";
++    private final Map<Integer, History> tasks = new HashMap<>();
++    private static final int LIMIT = 32;
++
++    public static void install(Application application) {
++        application.registerActivityLifecycleCallbacks(new GigiNavigation());
++    }
++
++    // Replaced by the patch with calls into the verified Reddit build.
++    private static Object topScreen(Activity activity) { return null; }
++    private static Bundle screenArgs(Object screen) { return null; }
++    private static void openScreen(Activity activity, Object screen, Object transition) { }
++
++    private static class Entry {
++        WeakReference<Object> identity;
++        final Class<?> screenType;
++        final Bundle args;
++        final Intent intent;
++
++        Entry(Activity activity, Object screen) {
++            identity = new WeakReference<>(screen);
++            if (screen != activity) {
++                screenType = screen.getClass();
++                Bundle source = screenArgs(screen);
++                args = source == null ? new Bundle() : source.deepCopy();
++                intent = null;
++            } else {
++                screenType = null;
++                args = null;
++                Intent source = activity.getIntent();
++                ComponentName target = source.getComponent();
++                String action = source.getAction();
++                // Only replay internal browsing activities. Share, login and result flows are one-shot.
++                intent = target != null && target.getPackageName().equals(activity.getPackageName())
++                        && (Intent.ACTION_VIEW.equals(action) || action == null)
++                        && source.getClipData() == null && activity.getCallingActivity() == null
++                        ? new Intent(source).setFlags(0) : null;
++            }
++        }
++
++        boolean canOpen() { return screenType != null || intent != null; }
++
++        Object reopen(Activity activity) throws ReflectiveOperationException {
++            if (screenType == null) {
++                activity.startActivity(new Intent(intent));
++                return null;
++            }
++            Object screen;
++            try {
++                screen = screenType.getConstructor(Bundle.class).newInstance(args.deepCopy());
++            } catch (NoSuchMethodException e) {
++                screen = screenType.getConstructor().newInstance();
++                screenArgs(screen).putAll(args.deepCopy());
++            }
++            openScreen(activity, screen, null);
++            return screen;
++        }
++    }
++
++    private static class History {
++        final ArrayList<Entry> entries = new ArrayList<>();
++        int index = -1;
++        Object pendingScreen;
++        ComponentName pendingActivity;
++        long pendingUntil;
++
++        void clearPending() {
++            pendingScreen = pendingActivity = null;
++            pendingUntil = 0;
++        }
++
++        void observe(Activity activity, Object screen) {
++            if (screen == null || index >= 0 && entries.get(index).identity.get() == screen) return;
++            if (pendingUntil > SystemClock.uptimeMillis() && index + 1 < entries.size()
++                    && (screen == pendingScreen || (pendingActivity != null
++                    && pendingActivity.equals(activity.getComponentName())))) {
++                entries.get(++index).identity = new WeakReference<>(screen);
++                clearPending();
++                return;
++            }
++            clearPending();
++            for (int i = entries.size() - 1; i >= 0; i--) {
++                if (entries.get(i).identity.get() == screen) {
++                    index = i;
++                    return;
++                }
++            }
++            entries.subList(index + 1, entries.size()).clear();
++            entries.add(new Entry(activity, screen));
++            if (entries.size() > LIMIT) entries.remove(0);
++            index = entries.size() - 1;
++        }
++
++        boolean canForward() {
++            return index + 1 < entries.size() && entries.get(index + 1).canOpen()
++                    && SystemClock.uptimeMillis() >= pendingUntil;
++        }
++
++        void forward(Activity activity) {
++            if (!canForward()) return;
++            Entry next = entries.get(index + 1);
++            try {
++                pendingUntil = SystemClock.uptimeMillis() + 2000;
++                pendingActivity = next.intent == null ? null : next.intent.getComponent();
++                pendingScreen = next.reopen(activity);
++            } catch (ReflectiveOperationException | RuntimeException e) {
++                clearPending();
++                android.util.Log.w("GigiNavigation", "Could not reopen " + next.screenType, e);
++            }
++        }
++    }
++
++    private static class Controls extends LinearLayout {
++        final Activity activity;
++        final History history;
++        final Button forward;
++
++        Controls(Activity activity, History history) {
++            super(activity);
++            this.activity = activity;
++            this.history = history;
++            GradientDrawable background = new GradientDrawable();
++            background.setColor(0xd9363636);
++            background.setCornerRadius(dp(24));
++            setBackground(background);
++            setElevation(dp(6));
++            Button back = button("‹", "Back");
++            forward = button("›", "Forward");
++            back.setOnClickListener(v -> activity.onBackPressed());
++            forward.setOnClickListener(v -> {
++                refresh();
++                history.forward(activity);
++                refresh();
++                postDelayed(this::refresh, 2100);
++            });
++            getViewTreeObserver().addOnGlobalLayoutListener(this::refresh);
++        }
++
++        int dp(int n) { return Math.round(getResources().getDisplayMetrics().density * n); }
++
++        Button button(String glyph, String label) {
++            Button b = new Button(activity, null, android.R.attr.borderlessButtonStyle);
++            b.setPadding(0, 0, 0, 0);
++            b.setText(glyph);
++            b.setTextSize(26);
++            b.setTextColor(Color.WHITE);
++            b.setContentDescription(label);
++            b.setTooltipText(label);
++            addView(b, new LinearLayout.LayoutParams(dp(48), dp(48)));
++            return b;
++        }
++
++        void refresh() {
++            if (activity.isFinishing() || activity.isDestroyed() || !activity.hasWindowFocus()) return;
++            Object screen = activity;
++            if (MAIN.equals(activity.getClass().getName())) {
++                try {
++                    screen = topScreen(activity);
++                } catch (RuntimeException ignored) {
++                    // The router can be unavailable during startup and teardown.
++                    return;
++                }
++            }
++            history.observe(activity, screen);
++            boolean enabled = history.canForward();
++            if (forward.isEnabled() != enabled) forward.setEnabled(enabled);
++            forward.setAlpha(enabled ? 1f : .45f);
++        }
++
++        @Override public void onWindowFocusChanged(boolean focus) {
++            super.onWindowFocusChanged(focus);
++            if (focus) post(this::refresh);
++        }
++    }
++
++    @Override public void onActivityResumed(Activity activity) {
++        FrameLayout decor = (FrameLayout) activity.getWindow().getDecorView();
++        for (int i = 0; i < decor.getChildCount(); i++) {
++            if (decor.getChildAt(i) instanceof Controls) return;
++        }
++        History history = tasks.computeIfAbsent(activity.getTaskId(), ignored -> new History());
++        Controls controls = new Controls(activity, history);
++        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
++                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
++                Gravity.BOTTOM | Gravity.END);
++        params.setMarginEnd(controls.dp(8));
++        params.bottomMargin = controls.dp(64);
++        controls.setOnApplyWindowInsetsListener((v, insets) -> {
++            int bottom = controls.dp(64) + insets.getSystemWindowInsetBottom();
++            if (params.bottomMargin != bottom) {
++                params.bottomMargin = bottom;
++                controls.setLayoutParams(params);
++            }
++            return insets;
++        });
++        decor.addView(controls, params);
++        controls.requestApplyInsets();
++    }
++
++    @Override public void onActivityDestroyed(Activity a) {
++        if (a.isTaskRoot() && a.isFinishing()) tasks.remove(a.getTaskId());
++    }
++    @Override public void onActivityCreated(Activity a, Bundle s) { }
++    @Override public void onActivityStarted(Activity a) { }
++    @Override public void onActivityPaused(Activity a) { }
++    @Override public void onActivityStopped(Activity a) { }
++    @Override public void onActivitySaveInstanceState(Activity a, Bundle s) { }
++}
+diff --git a/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiVideo.java b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiVideo.java
+new file mode 100644
+index 00000000..c4091d33
+--- /dev/null
++++ b/extensions/reddit/src/main/java/app/morphe/extension/reddit/patches/GigiVideo.java
+@@ -0,0 +1,32 @@
++package app.morphe.extension.reddit.patches;
++
++import com.reddit.domain.model.PlaybackMp4Permutation;
++import com.reddit.domain.model.PlaybackMp4s;
++import com.reddit.domain.model.VideoUrls;
++
++import java.util.List;
++
++@SuppressWarnings("unused")
++public final class GigiVideo {
++    // The app supplies directly playable MP4s for some clips. Longer videos benefit from adaptive quality.
++    public static String startupStream(VideoUrls urls) {
++        if (urls == null || urls.getLocalUri() != null) return null;
++        PlaybackMp4s mp4s = urls.getPlaybackMp4s();
++        if (mp4s == null || mp4s.getDurationSeconds() <= 0 || mp4s.getDurationSeconds() > 90) return null;
++        List<PlaybackMp4Permutation> choices = mp4s.getPermutations();
++        if (choices == null) return null;
++
++        int best = 0;
++        String selected = null;
++        for (PlaybackMp4Permutation choice : choices) {
++            if (choice == null || !"h264".equalsIgnoreCase(choice.getVideoCodecRaw())) continue;
++            int shortSide = Math.min(choice.getWidth(), choice.getHeight());
++            if (shortSide <= best || shortSide > 720) continue;
++            String url = choice.getUrl();
++            if (url == null || !url.startsWith("https://")) continue;
++            best = shortSide;
++            selected = url;
++        }
++        return selected;
++    }
++}
+diff --git a/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4Permutation.java b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4Permutation.java
+new file mode 100644
+index 00000000..5dc5d091
+--- /dev/null
++++ b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4Permutation.java
+@@ -0,0 +1,8 @@
++package com.reddit.domain.model;
++
++public final class PlaybackMp4Permutation {
++    public native String getUrl();
++    public native int getHeight();
++    public native int getWidth();
++    public native String getVideoCodecRaw();
++}
+diff --git a/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4s.java b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4s.java
+new file mode 100644
+index 00000000..6dc15ae6
+--- /dev/null
++++ b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/PlaybackMp4s.java
+@@ -0,0 +1,8 @@
++package com.reddit.domain.model;
++
++import java.util.List;
++
++public final class PlaybackMp4s {
++    public native List<PlaybackMp4Permutation> getPermutations();
++    public native int getDurationSeconds();
++}
+diff --git a/extensions/reddit/stub/src/main/java/com/reddit/domain/model/VideoUrls.java b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/VideoUrls.java
+new file mode 100644
+index 00000000..18cc841a
+--- /dev/null
++++ b/extensions/reddit/stub/src/main/java/com/reddit/domain/model/VideoUrls.java
+@@ -0,0 +1,6 @@
++package com.reddit.domain.model;
++
++public final class VideoUrls {
++    public native PlaybackMp4s getPlaybackMp4s();
++    public native String getLocalUri();
++}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/BackgroundPlaybackPatch.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/BackgroundPlaybackPatch.java
 index a7df9648..61027d92 100644
 --- a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/BackgroundPlaybackPatch.java
@@ -1973,10 +2289,10 @@ index 00000000..c0bb4351
 +    }
 +}
 diff --git a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
-index 7a85bec8..3b85282b 100644
+index 0ba9f7c4..485ea0c7 100644
 --- a/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
 +++ b/extensions/youtube/src/main/java/app/morphe/extension/youtube/patches/utils/FlyoutUtils.java
-@@ -795,6 +795,26 @@ public final class FlyoutUtils {
+@@ -811,6 +811,26 @@ public final class FlyoutUtils {
              );
          }
  
@@ -2086,6 +2402,138 @@ index 6f3a1f07..ee88e1d1 100644
          license = "GNU General Public License v3.0, with additional GPL section 7 requirements"
      }
  }
+diff --git a/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt b/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt
+new file mode 100644
+index 00000000..5856c8a4
+--- /dev/null
++++ b/patches/src/main/kotlin/app/morphe/patches/reddit/gigi/GigiRedditPatches.kt
+@@ -0,0 +1,126 @@
++package app.morphe.patches.reddit.gigi
++
++import app.morphe.patcher.Fingerprint
++import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
++import app.morphe.patcher.methodCall
++import app.morphe.patcher.patch.AppTarget
++import app.morphe.patcher.patch.Compatibility
++import app.morphe.patcher.patch.mutableClassDefBy
++import app.morphe.patcher.patch.patch
++import app.morphe.patcher.string
++import app.morphe.patches.reddit.misc.extension.sharedExtensionPatch
++import app.morphe.patches.reddit.shared.Constants.COMPATIBILITY_REDDIT
++
++// This build was inspected in the stock arm64 APK. Other 2026.40.0 releases have different DEX.
++private val target = Compatibility(
++    packageName = "com.reddit.frontpage",
++    name = "Reddit",
++    apkFileType = COMPATIBILITY_REDDIT.apkFileType,
++    signatures = COMPATIBILITY_REDDIT.signatures,
++    appIconColor = COMPATIBILITY_REDDIT.appIconColor,
++    targets = listOf(AppTarget(version = "2026.40.0", versionCode = 2640091, minSdk = 29))
++)
++
++private const val VIDEO = "Lapp/morphe/extension/reddit/patches/GigiVideo;"
++private const val HISTORY = "Lapp/morphe/extension/reddit/patches/GigiNavigation;"
++private const val URLS = "Lcom/reddit/domain/model/VideoUrls;"
++private const val TRANSPORT = "Lcom/reddit/domain/media/packagedmp4/PlaybackTransport;"
++
++private object ResolveStream : Fingerprint(
++    returnType = "Lgda0;",
++    parameters = listOf("Ljava/lang/String;", URLS, "Z"),
++    filters = listOf(string("VideoPlaybackResolver"), string("blank cacheKey"))
++)
++
++val gigiVideoPatch = patch(
++    name = "Gigi fast video startup",
++    description = "Uses a supplied H.264 MP4 for short Reddit clips in the feed and fullscreen when available."
++) {
++    compatibleWith(target)
++    dependsOn(sharedExtensionPatch)
++    execute {
++        // Feed view model, feed preload delegate and full bleed player all call this resolver.
++        ResolveStream.method.addInstructions(0, """
++            if-nez p3, :stock
++            invoke-static { p2 }, $VIDEO->startupStream($URLS)Ljava/lang/String;
++            move-result-object v0
++            if-eqz v0, :stock
++            new-instance v1, Lgda0;
++            sget-object v2, ${TRANSPORT}->MP4:$TRANSPORT
++            invoke-direct { v1, v0, v2 }, Lgda0;-><init>(Ljava/lang/String;$TRANSPORT)V
++            return-object v1
++            :stock
++            nop
++        """)
++    }
++}
++
++private object PostCommentsRequest : Fingerprint(
++    definingClass = "Lcom/reddit/comment/data/datasource/b;",
++    returnType = "Ll220;",
++    filters = listOf(methodCall(definingClass = "Ll220;", name = "<init>"))
++)
++
++val gigiCommentPatch = patch(
++    name = "Gigi progressive comments",
++    description = "Requests up to 12 comments in the first PostComments page and keeps Reddit's normal continuation pages."
++) {
++    compatibleWith(target)
++    execute {
++        // The original constructor maps p2 to count and p4 to after. v0-v2 are scratch at entry.
++        PostCommentsRequest.method.addInstructions(0, """
++            move-object/from16 v0, p4
++            if-nez v0, :stock
++            move-object/from16 v0, p2
++            const/16 v1, 12
++            if-eqz v0, :limit
++            invoke-virtual { v0 }, Ljava/lang/Integer;->intValue()I
++            move-result v2
++            if-le v2, v1, :stock
++            :limit
++            invoke-static { v1 }, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
++            move-result-object v0
++            move-object/16 p2, v0
++            :stock
++            nop
++        """)
++    }
++}
++
++private object ApplicationCreate : Fingerprint(
++    definingClass = "Lcom/reddit/frontpage/FrontpageApplication;",
++    name = "onCreate", parameters = listOf(), returnType = "V"
++)
++
++val gigiNavigationPatch = patch(
++    name = "Gigi Back and Forward",
++    description = "Adds Back and Forward buttons to Reddit activities and reopens screens from navigation history."
++) {
++    compatibleWith(target)
++    dependsOn(sharedExtensionPatch)
++    execute {
++        // Native helpers used by Reddit itself to find the top screen (including overlays)
++        // and push a screen through either of its router implementations.
++        mutableClassDefBy(HISTORY).methods.apply {
++            first { it.name == "topScreen" }.addInstructions(0, """
++                invoke-static { p0 }, Lpzo0;->I(Landroid/content/Context;)Lcom/reddit/screen/BaseScreen;
++                move-result-object p0
++                return-object p0
++            """)
++            first { it.name == "screenArgs" }.addInstructions(0, """
++                check-cast p0, Lcom/reddit/navstack/v;
++                iget-object p0, p0, Lcom/reddit/navstack/v;->c:Landroid/os/Bundle;
++                return-object p0
++            """)
++            first { it.name == "openScreen" }.addInstructions(0, """
++                check-cast p2, Lhhy;
++                check-cast p1, Lcom/reddit/screen/BaseScreen;
++                invoke-static { p0, p1, p2 }, Lpzo0;->g0(Landroid/content/Context;Lcom/reddit/screen/BaseScreen;Lhhy;)V
++                return-void
++            """)
++        }
++        ApplicationCreate.method.addInstructions(0, """
++            invoke-static/range { p0 .. p0 }, $HISTORY->install(Landroid/app/Application;)V
++        """)
++    }
++}
 diff --git a/patches/src/main/kotlin/app/morphe/patches/youtube/interaction/gigifactcheck/GigiFactCheckPatch.kt b/patches/src/main/kotlin/app/morphe/patches/youtube/interaction/gigifactcheck/GigiFactCheckPatch.kt
 new file mode 100644
 index 00000000..11948f8c
@@ -2523,10 +2971,10 @@ index 00000000..cbca8525
 +    }
 +}
 diff --git a/patches/src/main/resources/addresources/values/youtube/strings.xml b/patches/src/main/resources/addresources/values/youtube/strings.xml
-index f8c61b65..51a677a4 100644
+index 712135c3..60a8e5bd 100644
 --- a/patches/src/main/resources/addresources/values/youtube/strings.xml
 +++ b/patches/src/main/resources/addresources/values/youtube/strings.xml
-@@ -2162,4 +2162,27 @@ Automatic recording is optional. It stops in incognito or when the account chang
+@@ -2140,4 +2140,27 @@ Automatic recording is optional. It stops in incognito or when the account chang
      <string name="morphe_live_chat_translate_max_length_title">Maximum message length</string>
      <string name="morphe_live_chat_translate_max_length_summary">Longer messages are shown untranslated</string>
      <string name="morphe_live_chat_translate_max_length_no_limit">No limit</string>
