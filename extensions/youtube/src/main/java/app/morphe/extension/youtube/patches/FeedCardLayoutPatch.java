@@ -53,6 +53,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -180,6 +181,18 @@ public class FeedCardLayoutPatch {
     public interface ElementItemInterface {
         // Method is added during patching.
         byte[] patch_getElementBytes();
+    }
+
+    public interface ListLayoutInfoInterface {
+        // Methods are added during patching.
+        int patch_getColumnCount(int position);
+        Object patch_getSection();
+    }
+
+    public interface ListSectionInterface {
+        // Methods are added during patching.
+        int patch_getItemCount();
+        Object patch_getItem(int position);
     }
 
     private static final FeedCardLayout LAYOUT = Settings.FEED_CARD_LAYOUT.get();
@@ -326,6 +339,10 @@ public class FeedCardLayoutPatch {
     private static final int LIKE_STATUS_LIKE = 0;
     private static final int LIKE_STATUS_INDIFFERENT = 2;
     private static final int LIKE_STATUS_ENTITY_TYPE = 62;
+    /**
+     * Entity of the playlists that a video is saved to, which the save button of the watch page shows.
+     */
+    static final int SAVE_TO_PLAYLIST_LIST_ENTITY_TYPE = 231;
     private static final int ACTION_ADD_VIDEO = PlaylistEdit.PlaylistEditActionType.ACTION_ADD_VIDEO_VALUE;
 
     /**
@@ -483,6 +500,12 @@ public class FeedCardLayoutPatch {
      * List item without the spacing of the list.
      */
     private static final Object ITEM_WITHOUT_DIVIDER = new Object();
+    /**
+     * Sections of the lists with cards that have the spacing of the cards. A list without these cards
+     * is checked again when its gap is read, as the list can get cards later.
+     */
+    private static final Set<Object> cardLists =
+            Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
     /**
      * Clips of the Shorts of the Shorts shelves, by the screen bounds of the Shorts and of their thumbnails.
      */
@@ -1155,13 +1178,11 @@ public class FeedCardLayoutPatch {
                                         .build();
                             }
 
-                            String entityKey = Base64.encodeToString(LikeStatusEntityKey.newBuilder()
-                                            .setVideoId(contentId)
-                                            .setEntityType(LIKE_STATUS_ENTITY_TYPE)
-                                            .setVersion(1)
-                                            .build()
-                                            .toByteArray(),
-                                    Base64.URL_SAFE | Base64.NO_WRAP).replace("=", "%3D");
+                            String entityKey = videoEntityKey(contentId, LIKE_STATUS_ENTITY_TYPE);
+                            // The save button is filled while the video is saved, the same as the save button
+                            // of the watch page, and opens the playlists of the video once it's saved.
+                            String saveEntityKey = videoEntityKey(contentId, SAVE_TO_PLAYLIST_LIST_ENTITY_TYPE);
+                            FeedVideoActionsPatch.onCardSaveButton(contentId, saveEntityKey);
 
                             metadata.addActionButtons(ActionButton.newBuilder()
                                             .setLikeButtonViewModel(LikeButtonViewModel.newBuilder()
@@ -1184,7 +1205,8 @@ public class FeedCardLayoutPatch {
                                             .setAddToPlaylistButtonViewModel(AddToPlaylistButtonViewModel.newBuilder()
                                                     .setToggleButtonViewModel(toggleButton(
                                                             button(icons.save, "", saveOnTap),
-                                                            button(icons.saved, "", saveOnTap)))));
+                                                            button(icons.saved, "", saveOnTap)))
+                                                    .setAddToPlaylistEntityKey(saveEntityKey)));
                         }
 
                         // The template draws the background below the thumbnail only for the cards with inline
@@ -1593,20 +1615,8 @@ public class FeedCardLayoutPatch {
      */
     public static Object getDividerItem(@Nullable Object item) {
         try {
-            if (listsDrawCards() && item instanceof ElementItemInterface element) {
-                byte[] bytes = element.patch_getElementBytes();
-                if (bytes != null) {
-                    Boolean card = cardElements.get(bytes);
-                    if (card == null) {
-                        card = CARD.search.matches(bytes) && isCardLabel(Element.parseFrom(bytes).getType()
-                                .getComponentType().getModel().getLockupModel().getViewModel().getLockupViewModel()
-                                .getRendererContext().getAccessibilityContext().getLabel());
-                        cardElements.put(bytes, card);
-                    }
-                    if (card) {
-                        return ITEM_WITHOUT_DIVIDER;
-                    }
-                }
+            if (listsDrawCards() && isCardItem(item)) {
+                return ITEM_WITHOUT_DIVIDER;
             }
         } catch (Exception ex) {
             Logger.printException(() -> "getDividerItem failure", ex);
@@ -1615,16 +1625,72 @@ public class FeedCardLayoutPatch {
     }
 
     /**
+     * @return If the item is a card with the spacing of the cards.
+     */
+    private static boolean isCardItem(@Nullable Object item) throws InvalidProtocolBufferException {
+        if (!(item instanceof ElementItemInterface element)) {
+            return false;
+        }
+        byte[] bytes = element.patch_getElementBytes();
+        if (bytes == null) {
+            return false;
+        }
+        Boolean card = cardElements.get(bytes);
+        if (card == null) {
+            card = CARD.search.matches(bytes) && isCardLabel(Element.parseFrom(bytes).getType()
+                    .getComponentType().getModel().getLockupModel().getViewModel().getLockupViewModel()
+                    .getRendererContext().getAccessibilityContext().getLabel());
+            cardElements.put(bytes, card);
+        }
+        return card;
+    }
+
+    /**
      * Injection point.
      * Called when the layout of a section of a list is made.
      *
      * @param columnCount Columns of the section.
      * @param rowGapDp    Gap between the rows of the section.
-     * @return The gap between the rows, which is removed from the sections of one column when the lists draw cards,
-     *         as the cards have their own spacing.
+     * @return The gap between the rows, which is removed from the sections of one column with the card layout,
+     *         as the cards have their own spacing. The default layout removes it in
+     *         {@link #getRowGap(Object, int, int)}.
      */
     public static float getSectionRowGap(int columnCount, float rowGapDp) {
-        return listsDrawCards() && columnCount == 1 ? 0 : rowGapDp;
+        return CARD_LAYOUT && columnCount == 1 ? 0 : rowGapDp;
+    }
+
+    /**
+     * Injection point.
+     * Called when the layout manager of a list reads the gap between the rows of the section of an item,
+     * or of the list.
+     *
+     * @param listLayoutInfo The layout info of the list.
+     * @param position       Position of the item.
+     * @param rowGapDp       Gap between the rows, or -1 if the section has no layout.
+     * @return The gap between the rows, which the default layout removes from the sections of one column
+     *         of the lists with the cards of the newer A/B test, as these cards get the spacing of the cards.
+     *         The lists without these cards, such as the lists of the classic layout, keep their gap.
+     */
+    public static int getRowGap(Object listLayoutInfo, int position, int rowGapDp) {
+        try {
+            if (rowGapDp > 0 && newServerCardsShown && LAYOUT == FeedCardLayout.DEFAULT
+                    && listLayoutInfo instanceof ListLayoutInfoInterface layoutInfo
+                    && layoutInfo.patch_getColumnCount(position) == 1
+                    && layoutInfo.patch_getSection() instanceof ListSectionInterface section) {
+                if (cardLists.contains(section)) {
+                    return 0;
+                }
+                for (int i = 0, count = section.patch_getItemCount(); i < count; i++) {
+                    if (isCardItem(section.patch_getItem(i))) {
+                        cardLists.add(section);
+                        return 0;
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            Logger.printException(() -> "getRowGap failure", ex);
+        }
+        return rowGapDp;
     }
 
     /**
@@ -2975,6 +3041,15 @@ public class FeedCardLayoutPatch {
         String label = rendererContext.getAccessibilityContext().getLabel();
         LockupMetadataViewModel metadata = lockupViewModel.getMetadata().getLockupMetadataViewModel();
         final int contentType = lockupViewModel.getContentType();
+        if (ACTION_BUTTONS && contentType == LOCKUP_CONTENT_TYPE_VIDEO) {
+            // The save button shows only the videos saved in the app session, see onCardSaveButton().
+            for (ActionButton button : metadata.getActionButtonsList()) {
+                String saveEntityKey = button.getAddToPlaylistButtonViewModel().getAddToPlaylistEntityKey();
+                if (!saveEntityKey.isEmpty()) {
+                    FeedVideoActionsPatch.onCardSaveButton(lockupViewModel.getContentId(), saveEntityKey);
+                }
+            }
+        }
         // The card layout without buttons removes the buttons of the videos and the Shorts that YouTube
         // sends as cards with buttons. The other cards, such as the playlists and the promotions,
         // keep their buttons, as their menu may not have their actions.
@@ -3113,6 +3188,19 @@ public class FeedCardLayoutPatch {
                         .setOpenPopupAction(openPopupAction.toBuilder()
                                 .setPopup(popup.toBuilder().setMenuRenderer(menu).build().toByteString())))
                 .build();
+    }
+
+    /**
+     * @return The key of an entity of a video, such as its like status.
+     */
+    static String videoEntityKey(String videoId, int entityType) {
+        return Base64.encodeToString(LikeStatusEntityKey.newBuilder()
+                        .setVideoId(videoId)
+                        .setEntityType(entityType)
+                        .setVersion(1)
+                        .build()
+                        .toByteArray(),
+                Base64.URL_SAFE | Base64.NO_WRAP).replace("=", "%3D");
     }
 
     private static InnertubeCommandHolder likeCommand(String videoId, int status) {

@@ -18,6 +18,7 @@ import app.morphe.extension.reddit.patches.ColorizeCommentIndentLinesPatch.Comme
 import app.morphe.extension.reddit.patches.FeedAutoScrollPatch.ScrollSpeed;
 import app.morphe.extension.reddit.patches.GlassNavigationBarPatch.FrostedGlassAvailability;
 import app.morphe.extension.reddit.patches.GlassNavigationBarPatch.GlassColor;
+import app.morphe.extension.reddit.patches.GlassNavigationBarPatch.GlassStrength;
 import app.morphe.extension.reddit.patches.GlassNavigationBarPatch.GlassStyle;
 import app.morphe.extension.reddit.patches.PostSidePanelPatch.FeedDim;
 import app.morphe.extension.reddit.patches.PostSidePanelPatch.PanelWidth;
@@ -44,11 +45,15 @@ public class Settings extends BaseSettings {
     public static final BooleanSetting GLASS_NAVIGATION_BAR = new BooleanSetting("morphe_glass_navigation_bar", FALSE, true);
     public static final EnumSetting<GlassColor> GLASS_NAVIGATION_BAR_COLOR = new EnumSetting<>("morphe_glass_navigation_bar_color", GlassColor.AUTO, true, parent(GLASS_NAVIGATION_BAR));
     public static final EnumSetting<GlassStyle> GLASS_NAVIGATION_BAR_STYLE = new EnumSetting<>("morphe_glass_navigation_bar_style", GlassStyle.TINTED, true, parent(GLASS_NAVIGATION_BAR));
+    public static final EnumSetting<GlassStrength> GLASS_NAVIGATION_BAR_STRENGTH = new EnumSetting<>("morphe_glass_navigation_bar_strength", GlassStrength.CLEAR, true, parent(GLASS_NAVIGATION_BAR));
     public static final IntegerSetting GLASS_NAVIGATION_BAR_BLUR = new IntegerSetting("morphe_glass_navigation_bar_blur", 60, true, new FrostedGlassAvailability());
     public static final IntegerSetting GLASS_NAVIGATION_BAR_OPACITY = new IntegerSetting("morphe_glass_navigation_bar_opacity", 70, true, parent(GLASS_NAVIGATION_BAR));
     public static final BooleanSetting GLASS_NAVIGATION_BAR_ROUND_ENDS = new BooleanSetting("morphe_glass_navigation_bar_round_ends", TRUE, true, parent(GLASS_NAVIGATION_BAR));
     public static final IntegerSetting GLASS_NAVIGATION_BAR_HEIGHT = new IntegerSetting("morphe_glass_navigation_bar_height", 100, true, parent(GLASS_NAVIGATION_BAR));
     public static final IntegerSetting GLASS_NAVIGATION_BAR_WIDTH = new IntegerSetting("morphe_glass_navigation_bar_width", 100, true, parent(GLASS_NAVIGATION_BAR));
+    public static final IntegerSetting GLASS_NAVIGATION_BAR_POSITION = new IntegerSetting("morphe_glass_navigation_bar_position", 0, true, parent(GLASS_NAVIGATION_BAR));
+    public static final BooleanSetting GLASS_NAVIGATION_BAR_SHOW_LABELS = new BooleanSetting("morphe_glass_navigation_bar_show_labels", TRUE, true, parent(GLASS_NAVIGATION_BAR));
+    public static final BooleanSetting GLASS_NAVIGATION_BAR_SEARCH_BUTTON = new BooleanSetting("morphe_glass_navigation_bar_search_button", FALSE, true, parent(GLASS_NAVIGATION_BAR));
     public static final BooleanSetting HIDE_ANSWERS_BUTTON = new BooleanSetting("morphe_hide_answers_button", FALSE, true);
     public static final BooleanSetting HIDE_CHAT_BUTTON = new BooleanSetting("morphe_hide_chat_button", FALSE, true);
     public static final BooleanSetting HIDE_CREATE_BUTTON = new BooleanSetting("morphe_hide_create_button", FALSE, true);
@@ -76,6 +81,7 @@ public class Settings extends BaseSettings {
     public static final BooleanSetting HIDE_REDDIT_PRO_SHELF = new BooleanSetting("morphe_hide_reddit_pro_shelf", FALSE, true);
     public static final BooleanSetting HIDE_RESOURCES_SHELF = new BooleanSetting("morphe_hide_resources_shelf", FALSE, true);
     public static final BooleanSetting HIDE_START_A_COMMUNITY_SHELF = new BooleanSetting("morphe_hide_start_a_community_shelf", FALSE, true);
+    public static final BooleanSetting SETTINGS_IN_SIDEBAR = new BooleanSetting("morphe_settings_in_sidebar", TRUE, true);
 
     // Filters
     /**
@@ -195,6 +201,8 @@ public class Settings extends BaseSettings {
                 70, 150, 5, "%"));
         SeekBarPreference.register(new SeekBarConfig(GLASS_NAVIGATION_BAR_WIDTH,
                 50, 100, 5, "%"));
+        SeekBarPreference.register(new SeekBarConfig(GLASS_NAVIGATION_BAR_POSITION,
+                0, 32, 4, "dp"));
 
         // region Migration
 

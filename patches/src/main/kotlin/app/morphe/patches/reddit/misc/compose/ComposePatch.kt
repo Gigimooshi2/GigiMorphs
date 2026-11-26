@@ -54,6 +54,15 @@ internal val composePatch = patch {
             )
             addPatchInterface(
                 MODIFIER_INTERFACE,
+                "patch_offset",
+                """
+                    invoke-static/range { p0 .. p2 }, ${OffsetFingerprint.method}
+                    move-result-object v0
+                    return-object v0
+                """
+            )
+            addPatchInterface(
+                MODIFIER_INTERFACE,
                 "patch_padding",
                 """
                     invoke-static/range { p0 .. p4 }, ${PaddingFingerprint.method}
@@ -86,11 +95,7 @@ internal val composePatch = patch {
             addPatchInterface(
                 CONTENT_DRAW_SCOPE_INTERFACE,
                 "patch_getSize",
-                """
-                    invoke-interface { p0 }, ${DrawRoundRectFingerprint.instructionMatches[0].methodReference}
-                    move-result-wide v0
-                    return-wide v0
-                """
+                DrawRoundRectFingerprint.instructionMatches[0].methodReference
             )
             addPatchInterface(
                 CONTENT_DRAW_SCOPE_INTERFACE,
