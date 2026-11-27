@@ -24,6 +24,7 @@ import androidx.annotation.ColorInt;
 import androidx.annotation.Nullable;
 
 import com.reddit.launch.bottomnav.BottomNavScreen;
+import com.reddit.screen.ComposeBottomSheetScreen;
 
 import java.util.List;
 
@@ -155,6 +156,30 @@ public final class GlassNavigationBarPatch {
     }
 
     /**
+     * Draws a soft pill behind the selected bottom navigation bar button.
+     */
+    private static final class BarPillDraw implements Function1<ContentDrawScope, Object> {
+        private static final BarPillDraw INSTANCE = new BarPillDraw();
+
+        private BarPillDraw() {
+        }
+
+        @Override
+        public Object invoke(ContentDrawScope scope) {
+            try {
+                if (isBarPillActive()) {
+                    drawNavPill(scope);
+                }
+            } catch (Exception ex) {
+                Logger.printException(() -> "BarPillDraw failure", ex);
+            }
+
+            scope.patch_drawContent();
+            return null;
+        }
+    }
+
+    /**
      * Click action of the hidden search field.
      */
     private static final class NoClick implements Function0<Object> {
@@ -198,6 +223,15 @@ public final class GlassNavigationBarPatch {
     private static final float BAR_ROW_HEIGHT_DP = 50;
     private static final float BAR_CAPSULE_HEIGHT_DP = 60;
     private static final float BAR_CAPSULE_INSET_DP = 20;
+    private static final float BAR_PILL_INSET_DP = 6;
+    /**
+     * Black at 7% opacity.
+     */
+    private static final long PILL_COLOR_LIGHT = 0x12000000L << 32;
+    /**
+     * White at 14% opacity.
+     */
+    private static final long PILL_COLOR_DARK = 0x24FFFFFFL << 32;
 
     /**
      * A taller system navigation bar has buttons and can be almost opaque.
@@ -263,6 +297,11 @@ public final class GlassNavigationBarPatch {
      * If the side rail is shown instead of the bottom navigation bar.
      */
     private static boolean isRailShown;
+
+    /**
+     * Full glass height of the top bar buttons, in pixels.
+     */
+    private static float topBarButtonGlassHeightPx;
 
     /**
      * @return If this patch was included during patching.
@@ -437,6 +476,19 @@ public final class GlassNavigationBarPatch {
     /**
      * Injection point.
      *
+     * @param selected If the bottom navigation bar button is selected.
+     * @param modifier Modifier of the bottom navigation bar button.
+     */
+    @Nullable
+    public static Object getBarButtonModifier(boolean selected, @Nullable Modifier modifier) {
+        return selected && modifier != null && isBarPillActive()
+                ? modifier.patch_drawWithContent(BarPillDraw.INSTANCE)
+                : modifier;
+    }
+
+    /**
+     * Injection point.
+     *
      * @param modifier Modifier of the search field at the top of Home.
      */
     public static Object getSearchFieldModifier(Modifier modifier) {
@@ -478,6 +530,31 @@ public final class GlassNavigationBarPatch {
     }
 
     /**
+     * @return If the glass of the Home top bar buttons and tabs blurs the feed.
+     */
+    private static boolean isTopBarFrosted() {
+        return FROSTED_ENABLED && isSearchButtonActive();
+    }
+
+    /**
+     * @param modifier Modifier of the Home feed.
+     */
+    static Object getFeedFrostedModifier(Modifier modifier) {
+        return isTopBarFrosted()
+                ? modifier.patch_drawWithContent(GlassNavigationBarBlur.FeedDraw.INSTANCE)
+                : modifier;
+    }
+
+    /**
+     * @param modifier Modifier of the Home top bar, outside its graphics layer.
+     */
+    static Object getTopBarFrostedModifier(Modifier modifier) {
+        return isTopBarFrosted()
+                ? modifier.patch_drawWithContent(GlassNavigationBarBlur.TopBarDraw.INSTANCE)
+                : modifier;
+    }
+
+    /**
      * Injection point.
      */
     public static void onScreenAttached(Object screen, @Nullable View view) {
@@ -488,6 +565,8 @@ public final class GlassNavigationBarPatch {
         try {
             if (screen instanceof BottomNavScreen) {
                 GlassNavigationBarSearchButton.onBottomNavAttached(view);
+            } else if (screen instanceof ComposeBottomSheetScreen) {
+                GlassNavigationBarSearchButton.onBottomSheetAttached(screen);
             }
         } catch (Exception ex) {
             Logger.printException(() -> "onScreenAttached failure", ex);
@@ -505,6 +584,8 @@ public final class GlassNavigationBarPatch {
         try {
             if (screen instanceof BottomNavScreen) {
                 GlassNavigationBarSearchButton.onBottomNavDetached();
+            } else if (screen instanceof ComposeBottomSheetScreen) {
+                GlassNavigationBarSearchButton.onBottomSheetDetached(screen);
             }
         } catch (Exception ex) {
             Logger.printException(() -> "onScreenDetached failure", ex);
@@ -563,6 +644,18 @@ public final class GlassNavigationBarPatch {
     static boolean isSearchButtonActive() {
         // The window width is checked too, because the top of Home can be shown before the side rail.
         return SEARCH_BUTTON_ENABLED && !isRailShown && getScreenWidthDp() < SIDE_RAIL_MIN_WIDTH_DP;
+    }
+
+    static boolean isSearchButtonEnabled() {
+        return SEARCH_BUTTON_ENABLED;
+    }
+
+    private static boolean isBarPillActive() {
+        return GLASS_ENABLED && !isRailShown && getScreenWidthDp() < SIDE_RAIL_MIN_WIDTH_DP;
+    }
+
+    static float getTopBarButtonGlassHeightPx() {
+        return topBarButtonGlassHeightPx;
     }
 
     private static void setRailShown(boolean shown) {
@@ -629,7 +722,7 @@ public final class GlassNavigationBarPatch {
 
         float left = getSidePadding(width)
                 + BAR_CAPSULE_INSET_DP * density * WIDTH_PERCENT / 100;
-        float height = BAR_CAPSULE_HEIGHT_DP * density * HEIGHT_PERCENT / 100;
+        float height = getBarCapsuleHeightPx(density);
         final float top = (rowHeight - height) / 2;
 
         if (barHeight - rowHeight > GESTURE_NAVIGATION_MAX_HEIGHT_DP * density) {
@@ -713,13 +806,31 @@ public final class GlassNavigationBarPatch {
         final float extra = TOP_BAR_BUTTON_GLASS_EXTRA_DP * getDensity();
         final float height = unpackSecond(size) + extra;
         final float width = Math.max(unpackFirst(size) + extra, height);
-        final float radius = height / 2;
         final float left = (unpackFirst(size) - width) / 2;
         final float top = -extra / 2;
+
+        topBarButtonGlassHeightPx = height;
+        drawTopBarGlass(scope, left, top, width, height);
+    }
+
+    /**
+     * Draws a glass pill behind a top bar element.
+     */
+    static void drawTopBarGlass(ContentDrawScope scope, float left, float top,
+                                float width, float height) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        final float radius = height / 2;
         final boolean dark = isGlassDark();
         Canvas canvas = scope.patch_getCanvas().patch_getNativeCanvas();
 
         GlassNavigationBarEdge.drawShadow(canvas, left, top, width, height, radius);
+
+        if (FROSTED_ENABLED) {
+            GlassNavigationBarBlur.drawTopBarBackdrop(scope, left, top, width, height, radius);
+        }
 
         scope.patch_drawRoundRect(
                 getGlassColor(dark),
@@ -731,8 +842,54 @@ public final class GlassNavigationBarPatch {
         GlassNavigationBarEdge.drawOutline(canvas, left, top, width, height, radius, dark);
     }
 
+    private static float getBarCapsuleHeightPx(float density) {
+        return BAR_CAPSULE_HEIGHT_DP * density * HEIGHT_PERCENT / 100;
+    }
+
+    private static void drawNavPill(ContentDrawScope scope) {
+        final long size = scope.patch_getSize();
+        final float width = unpackFirst(size);
+        final float height = unpackSecond(size);
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        final float density = getDensity();
+        final float inset = BAR_PILL_INSET_DP * density;
+        final float pillWidth = width - 2 * inset;
+        final float pillHeight = getBarCapsuleHeightPx(density) - 2 * inset;
+        if (pillWidth <= 0 || pillHeight <= 0) {
+            return;
+        }
+
+        final float left = (width - pillWidth) / 2;
+        final float top = (height - pillHeight) / 2;
+        final float radius = Settings.GLASS_NAVIGATION_BAR_ROUND_ENDS.get()
+                ? pillHeight / 2
+                : (CORNER_RADIUS_DP - BAR_PILL_INSET_DP) * density;
+
+        drawPill(scope, left, top, pillWidth, pillHeight, radius);
+    }
+
+    /**
+     * Draws a pill behind a selected button or tab.
+     */
+    static void drawPill(ContentDrawScope scope, float left, float top,
+                         float width, float height, float radius) {
+        scope.patch_drawRoundRect(
+                isGlassDark() ? PILL_COLOR_DARK : PILL_COLOR_LIGHT,
+                pack(left, top),
+                pack(width, height),
+                pack(radius, radius)
+        );
+    }
+
     static int getPageColor() {
         return pageColor;
+    }
+
+    static long getPackedPageColor() {
+        return ((long) pageColor) << 32;
     }
 
     static boolean isGlassDark() {
