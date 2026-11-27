@@ -16,6 +16,7 @@ import android.preference.PreferenceScreen;
 
 import app.morphe.extension.reddit.patches.AppIconPatch;
 import app.morphe.extension.reddit.patches.DownloadAllFromGalleryPatch;
+import app.morphe.extension.reddit.patches.GigiRedditFactCheck;
 import app.morphe.extension.reddit.patches.DownloadLocationPatch;
 import app.morphe.extension.reddit.patches.EnableDebuggingPatch;
 import app.morphe.extension.reddit.patches.OpenLinksDirectlyPatch;
@@ -32,6 +33,7 @@ import app.morphe.extension.reddit.settings.Settings;
 import app.morphe.extension.reddit.settings.preference.BooleanSettingPreference;
 import app.morphe.extension.reddit.settings.preference.DownloadLocationPreference;
 import app.morphe.extension.reddit.settings.preference.FeatureFlagsManagerPreference;
+import app.morphe.extension.reddit.settings.preference.StringSettingPreference;
 import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.settings.BaseSettings;
@@ -52,7 +54,8 @@ public class MiscellaneousPreferenceCategory extends ConditionalPreferenceCatego
 
     @Override
     public boolean getSettingsStatus() {
-        return CrashReports.isPatchIncluded() || AppIconPatch.isPatchIncluded() ||
+        return CrashReports.isPatchIncluded() || GigiRedditFactCheck.isPatchIncluded() ||
+                AppIconPatch.isPatchIncluded() ||
                 DownloadAllFromGalleryPatch.isPatchIncluded() ||
                 DownloadLocationPatch.isPatchIncluded() ||
                 EnableDebuggingPatch.isPatchIncluded() ||
@@ -73,6 +76,20 @@ public class MiscellaneousPreferenceCategory extends ConditionalPreferenceCatego
             reports.setTitle("Gigi crash reports");
             reports.setIntent(new Intent(context, ReportActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             addPreference(reports);
+        }
+        if (GigiRedditFactCheck.isPatchIncluded()) try {
+            BooleanSettingPreference button = new BooleanSettingPreference(context, GigiRedditFactCheck.BUTTON);
+            button.setTitle("Fact check button on Reddit videos");
+            button.setSummaryOn("🔎 in the Gigi video controls sends the video to Telegram (takes effect on new videos)");
+            button.setSummaryOff("No 🔎 button");
+            addPreference(button);
+            StringSettingPreference chat = new StringSettingPreference(context, GigiRedditFactCheck.TELEGRAM_CHAT_ID);
+            chat.setTitle("Fact check (GigiMorphs): bot chat id");
+            chat.setSummary("Numeric Telegram chat id of the fact check bot. Telegram then opens that chat directly"
+                    + " when it offers it as a share target");
+            addPreference(chat);
+        } catch (Throwable ignored) {
+            // The settings screen must open even if these two cannot be shown.
         }
         Preference about = new MorpheAboutPreference(context);
         about.setTitle(str("morphe_about_screen_title"));

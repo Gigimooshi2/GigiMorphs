@@ -20,6 +20,8 @@ Add to Morphe Manager: https://morphe.software/add-source?github=Gigimooshi2/Gig
 
 - **Fact check pop-ups.** New patch: when a video you had fact checked plays, each checked claim pops up over the player at the moment it is said (verdict, claim, one line of why), for 12 seconds. Tap it for the details and sources, or "All claims" for the full list (tap a claim to jump to it); hold it to close. At the start a banner shows how many claims were checked. The fact checks come from the fact checker's relay (`GET <server>/fc/<videoId>` with a read-only key); nothing is requested until the server address and key are set in Settings > Misc > Fact check pop-ups (GigiMorphs).
 
+- **Reddit: fact check button.** "Gigi video controls" gets a 🔎 button (Settings > Misc: "Fact check button on Reddit videos", and the bot chat id). On tap it finds the post on the open screen (title, subreddit, author, permalink), reads its v.redd.it DASH manifest, downloads H.264 video at 720p or lower with its audio and merges them (≤ 19.5 MB; otherwise a lower rendition, then audio only, then the fallback MP4), copies the file to Download/FactCheck as `video/mp4` and opens Telegram with it and a `#factcheck` caption. If the manifest duration differs from the playing video, it refuses instead of sending another post's video. Works from a post's own screen; in the feed it asks to open the post until the video surface's post is mapped (see `REDDIT_FACTCHECK_BRIEF.md`). Nothing runs before the tap.
+
 ## How it works
 - `build.yml`: on push to main, builds the `.mpp`, creates a release, updates `patches-bundle.json`.
 - `sync-upstream.yml`: daily, rebuilds the tree from upstream `dev`, re-applies `gigimorphs.patch`, then builds. Fails loudly if the patch no longer applies.

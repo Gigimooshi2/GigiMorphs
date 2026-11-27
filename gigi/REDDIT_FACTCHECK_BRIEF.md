@@ -54,3 +54,21 @@ Reuse the existing "Fact check (GigiMorphs)" screen (chat id). Add a switch "Fac
 
 Open a Reddit video post → tap 🔎 → Telegram opens with the MP4 and the `#factcheck` caption → send to the bot.
 The bot should reply "🔎 Got it, checking…".
+
+## Status (branch `claude/reddit-factcheck-button`, not built yet)
+
+Done, without the obfuscated names:
+- `GigiRedditFactCheck` (extension): finds the post's `com.reddit.domain.model.Link` in the top screen's
+  args/fields (same native helpers as Gigi Back and Forward, `Lpzo0;->I`, `navstack/v;->c`), or a `t3_` id
+  there (then public `by_id` JSON, fetched on tap), reads the v.redd.it DASH manifest, picks H.264 ≤720p +
+  audio that fit 19.5 MB, merges with MediaMuxer, shares to Telegram (`gigi_factcheck_chat_id`, same as YouTube).
+  Refuses if the manifest duration is >2.5 s from the player's (a video pager showing another post).
+- 🔎 button in `GigiPlayerControls`, setting `gigi_reddit_factcheck_button` (default on) + chat id in Misc.
+
+Still needs the APK (Reddit **2026.40.0, versionCode 2640091, arm64-v8a**, the exact build the Gigi patches
+target). Two stubs in `GigiRedditFactCheck` return null until patched:
+- `surfacePost(Object surfaceModel)`: the `Link` bound to `Lcom/reddit/exokit/internal/ui/b;` (feed support).
+- `playerMediaUri(Object player)`: `Leci;` → current MediaItem → localConfiguration.uri (direct MP4 first, and
+  a surer match than the duration check).
+APK mirrors were not reachable from the cloud session (APKMirror/APKPure: Cloudflare challenge; Uptodown:
+captcha token). Upload that APK (or the .apkm bundle) to the session/repo to finish these.

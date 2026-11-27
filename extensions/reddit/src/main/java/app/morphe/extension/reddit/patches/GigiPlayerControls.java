@@ -90,6 +90,15 @@ public final class GigiPlayerControls extends LinearLayout {
             }
             @Override public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {}
         });
+        if (GigiRedditFactCheck.buttonEnabled()) {
+            button("🔎", "Fact check").setOnClickListener(v -> {
+                try {
+                    Object p = current();
+                    GigiRedditFactCheck.start(getContext(), model, p, p == null ? -1L : duration(p));
+                } catch (Throwable ignored) {
+                }
+            });
+        }
     }
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }

@@ -134,6 +134,7 @@ private const val MODEL = "Lcom/reddit/exokit/internal/ui/b;"
 private const val RENDERER = "Lcom/reddit/exokit/api/ui/b;"
 private const val PLAYER = "Leci;"
 private const val FUNCTION = "Lkotlin/jvm/functions/Function1;"
+private const val FACTCHECK = "Lapp/morphe/extension/reddit/patches/GigiRedditFactCheck;"
 
 private object VideoBox : Fingerprint(
     definingClass = RENDERER, name = "c", returnType = "V",
@@ -143,11 +144,31 @@ private object VideoBox : Fingerprint(
 
 val gigiPlayerControlsPatch = patch(
     name = "Gigi video controls",
-    description = "Adds play, pause, a scrubber and ten-second skips directly to Reddit video surfaces."
+    description = "Adds play, pause, a scrubber, ten-second skips and a fact check button (video to Telegram) directly to Reddit video surfaces."
 ) {
     compatibleWith(target)
-    dependsOn(sharedExtensionPatch)
+    dependsOn(sharedExtensionPatch, settingsPatch)
     execute {
+        // Fact check button: finds the post on the top screen (same native helpers as Gigi Back and
+        // Forward) and runs only when tapped. surfacePost and playerMediaUri stay unpatched (null)
+        // until they are mapped in the targeted APK. The extension catches
+        // everything these throw (a screen that is not a navstack screen throws ClassCastException).
+        setExtensionIsPatchIncluded(FACTCHECK)
+        mutableClassDefBy(FACTCHECK).methods.apply {
+            first { it.name == "topScreen" }.addInstructions(0, """
+                if-eqz p0, :done
+                invoke-static { p0 }, Lpzo0;->I(Landroid/content/Context;)Lcom/reddit/screen/BaseScreen;
+                move-result-object p0
+                :done
+                return-object p0
+            """)
+            first { it.name == "screenArgs" }.addInstructions(0, """
+                check-cast p0, Lcom/reddit/navstack/v;
+                iget-object p0, p0, Lcom/reddit/navstack/v;->c:Landroid/os/Bundle;
+                return-object p0
+            """)
+        }
+
         // Each branch emits one video surface in a Compose Box. Add our controls inside the
         // same Box, bound to that surface's model. Recycled feed cells receive a new binding.
         VideoBox.instructionMatches.asReversed().forEach { call ->
