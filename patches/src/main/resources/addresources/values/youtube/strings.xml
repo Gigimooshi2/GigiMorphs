@@ -38,6 +38,15 @@ Second \"item\" text"</string>
     <string name="gigi_factcheck_send_captions_summary_off" translatable="false">Only the video is sent, so Telegram can open the bot chat directly</string>
     <string name="gigi_factcheck_chat_id_title" translatable="false">Bot chat id</string>
     <string name="gigi_factcheck_chat_id_summary" translatable="false">Numeric id of the bot (the part of its token before the colon). Opens the bot chat directly when Telegram offers it as a share target</string>
+    <string name="gigi_factcheck_popups_screen_title" translatable="false">Fact check pop-ups (GigiMorphs)</string>
+    <string name="gigi_factcheck_popups_screen_summary" translatable="false">Show your fact checks over the video as each claim is said</string>
+    <string name="gigi_factcheck_popups_title" translatable="false">Show fact check pop-ups</string>
+    <string name="gigi_factcheck_popups_summary_on" translatable="false">When a video you had fact checked plays, each checked claim pops up at the moment it is said. Tap for details, hold to close</string>
+    <string name="gigi_factcheck_popups_summary_off" translatable="false">No pop-ups</string>
+    <string name="gigi_factcheck_popups_server_title" translatable="false">Fact checker server</string>
+    <string name="gigi_factcheck_popups_server_summary" translatable="false">Address of your fact checker\'s relay, starting with https://</string>
+    <string name="gigi_factcheck_popups_key_title" translatable="false">Pop-up key</string>
+    <string name="gigi_factcheck_popups_key_summary" translatable="false">The relay\'s read-only key (FC_READ_KEY). It can only read stored fact checks</string>
 
     <!-- misc.settings.settingsPatch -->
 
