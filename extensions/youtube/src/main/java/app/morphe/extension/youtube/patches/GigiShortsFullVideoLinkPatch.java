@@ -84,7 +84,7 @@ public final class GigiShortsFullVideoLinkPatch {
 
             Utils.runOnMainThreadDelayed(() -> {
                 Logger.printDebug(() -> "GigiMorphs: reopening " + videoId + " shortsOpen: " + ShortsPlayerState.isOpen());
-                LoadVideoPatch.openVideoIntent("https://www.youtube.com/watch?v=" + videoId, false);
+                LoadVideoPatch.openUrl("https://www.youtube.com/watch?v=" + videoId, false);
             }, CLOSE_SHORTS_DELAY_MS);
 
             return true;

@@ -172,7 +172,11 @@ public final class GigiFactCheckPopupsPatch {
 
             popup.setOnClickListener(v -> openDetails());
             popup.setOnLongClickListener(v -> {
-                dismissedIndex = shownIndex;
+                if (bannerShowing) {
+                    bannerShowing = false;
+                } else {
+                    dismissedIndex = shownIndex;
+                }
                 hide();
                 return true;
             });
