@@ -149,10 +149,13 @@ val gigiPlayerControlsPatch = patch(
     compatibleWith(target)
     dependsOn(sharedExtensionPatch, settingsPatch)
     execute {
-        // Fact check button: finds the post on the top screen (same native helpers as Gigi Back and
-        // Forward) and runs only when tapped. surfacePost and playerMediaUri stay unpatched (null)
-        // until they are mapped in the targeted APK. The extension catches
-        // everything these throw (a screen that is not a navstack screen throws ClassCastException).
+        // Fact check button: runs only when tapped. It reads the playing media item and the surface's
+        // video url, then finds the post with that video on the top screen (same native helpers as
+        // Gigi Back and Forward). The extension catches everything these throw (for example a
+        // screen that is not a navstack screen throws ClassCastException). Each helper uses only its
+        // parameter registers. Media3 in this build: eci.j() timeline, eci.f() current item index,
+        // o3j0 Timeline (o() window count, n(int, Window)), m3j0 Window (b MediaItem),
+        // kbu MediaItem (b localConfiguration), hbu LocalConfiguration (a uri).
         setExtensionIsPatchIncluded(FACTCHECK)
         mutableClassDefBy(FACTCHECK).methods.apply {
             first { it.name == "topScreen" }.addInstructions(0, """
@@ -165,6 +168,46 @@ val gigiPlayerControlsPatch = patch(
             first { it.name == "screenArgs" }.addInstructions(0, """
                 check-cast p0, Lcom/reddit/navstack/v;
                 iget-object p0, p0, Lcom/reddit/navstack/v;->c:Landroid/os/Bundle;
+                return-object p0
+            """)
+            first { it.name == "surfaceUrl" }.addInstructions(0, """
+                check-cast p0, $MODEL
+                iget-object p0, p0, ${MODEL}->r:Ljava/lang/String;
+                return-object p0
+            """)
+            first { it.name == "timeline" }.addInstructions(0, """
+                check-cast p0, $PLAYER
+                invoke-virtual { p0 }, ${PLAYER}->j()Lo3j0;
+                move-result-object p0
+                return-object p0
+            """)
+            first { it.name == "itemIndex" }.addInstructions(0, """
+                check-cast p0, $PLAYER
+                invoke-virtual { p0 }, ${PLAYER}->f()I
+                move-result p0
+                return p0
+            """)
+            first { it.name == "windowCount" }.addInstructions(0, """
+                check-cast p0, Lo3j0;
+                invoke-virtual { p0 }, Lo3j0;->o()I
+                move-result p0
+                return p0
+            """)
+            first { it.name == "newWindow" }.addInstructions(0, """
+                new-instance p0, Lm3j0;
+                invoke-direct { p0 }, Lm3j0;-><init>()V
+                return-object p0
+            """)
+            first { it.name == "windowUri" }.addInstructions(0, """
+                check-cast p0, Lo3j0;
+                check-cast p2, Lm3j0;
+                invoke-virtual { p0, p1, p2 }, Lo3j0;->n(ILm3j0;)V
+                iget-object p0, p2, Lm3j0;->b:Lkbu;
+                if-eqz p0, :done
+                iget-object p0, p0, Lkbu;->b:Lhbu;
+                if-eqz p0, :done
+                iget-object p0, p0, Lhbu;->a:Landroid/net/Uri;
+                :done
                 return-object p0
             """)
         }

@@ -111,12 +111,32 @@ public final class GigiRedditFactCheck {
     // Same helpers as GigiNavigation: the top screen (including overlays) and its arguments.
     private static Object topScreen(Activity activity) { return null; }
     private static Bundle screenArgs(Object screen) { return null; }
-    // The post bound to a video surface model, and the uri of the player's current media item.
-    // Not mapped yet in the targeted Reddit build: both stay null until then.
-    private static Object surfacePost(Object surfaceModel) { return null; }
-    private static String playerMediaUri(Object player) { return null; }
+    // The video url of a video surface model (com.reddit.exokit.internal.ui.b, VideoProps.url).
+    private static String surfaceUrl(Object surfaceModel) { return null; }
+    // Media3 in the targeted build, one step each so no stub needs scratch registers:
+    // player timeline, current item index, timeline window count, a new Window, and the
+    // uri of a window's MediaItem.localConfiguration.
+    private static Object timeline(Object player) { return null; }
+    private static int itemIndex(Object player) { return -1; }
+    private static int windowCount(Object timeline) { return 0; }
+    private static Object newWindow(Object unused) { return null; }
+    private static Object windowUri(Object timeline, int index, Object window) { return null; }
 
     // endregion
+
+    /** Uri of the player's current media item, or null. Main thread only. */
+    private static String playerMediaUri(Object player) {
+        if (player == null) return null;
+        Object timeline = timeline(player);
+        if (timeline == null) return null;
+        int index = itemIndex(player);
+        if (index < 0 || index >= windowCount(timeline)) return null;
+        Object window = newWindow(null);
+        if (window == null) return null;
+        Object uri = windowUri(timeline, index, window);
+        return uri == null ? null : uri.toString();
+    }
+
 
     public static boolean buttonEnabled() {
         try {
@@ -155,6 +175,7 @@ public final class GigiRedditFactCheck {
         Shared(Uri uri, String mimeType) { this.uri = uri; this.mimeType = mimeType; }
     }
 
+
     /**
      * Called on the main thread when 🔎 is tapped.
      *
@@ -178,46 +199,72 @@ public final class GigiRedditFactCheck {
         // Screens and the player belong to the main thread: read them here, work in the background.
         Link link = null;
         String postId = null;
+        boolean verified = false;
         String mediaUri = null;
-        try {
-            Object bound = surfacePost(surfaceModel);
-            if (bound instanceof Link) link = (Link) bound;
-        } catch (Throwable ex) {
-            log(LOG_PREFIX + "no post on the video surface", ex);
-        }
+        String videoUrl = null;
         try {
             mediaUri = playerMediaUri(player);
         } catch (Throwable ex) {
             log(LOG_PREFIX + "no media uri from the player", ex);
         }
-        if (link == null) {
-            try {
-                Object screen = topScreen(activity(context));
-                Finder finder = new Finder();
-                if (screen != null) {
-                    try {
-                        finder.scan(screenArgs(screen), 0);
-                    } catch (Throwable ex) {
-                        log(LOG_PREFIX + "no screen args", ex);
-                    }
-                    if (finder.link == null) finder.scanFields(screen);
+        try {
+            videoUrl = surfaceUrl(surfaceModel);
+        } catch (Throwable ex) {
+            log(LOG_PREFIX + "no url on the video surface", ex);
+        }
+        String key = mediaKey(mediaUri);
+        if (key == null) key = mediaKey(videoUrl);
+        try {
+            Object screen = topScreen(activity(context));
+            if (screen != null) {
+                Finder args = new Finder(null);
+                Bundle bundle = null;
+                try {
+                    bundle = screenArgs(screen);
+                } catch (Throwable ex) {
+                    log(LOG_PREFIX + "no screen args", ex);
                 }
-                link = finder.link;
-                postId = finder.postId;
-            } catch (Throwable ex) {
-                log(LOG_PREFIX + "no post on the top screen", ex);
+                args.walk(bundle, true);
+                if (key != null && args.link != null && matches(args.link, key)) {
+                    link = args.link;
+                    verified = true;
+                } else if (key != null) {
+                    // The feed or a video pager: the post whose video is the one playing.
+                    Finder search = new Finder(key);
+                    search.walk(bundle, false);
+                    if (search.link == null) search.walk(screen, false);
+                    link = search.link;
+                    verified = link != null;
+                }
+                if (link == null) {
+                    // Not matched (or nothing to match with): the screen's own post, checked by duration later.
+                    if (args.link == null) {
+                        Finder fields = new Finder(null);
+                        fields.walk(screen, false);
+                        args.link = fields.link;
+                    }
+                    link = args.link;
+                    postId = args.postId;
+                }
             }
+        } catch (Throwable ex) {
+            log(LOG_PREFIX + "no post on the top screen", ex);
         }
 
         final Link foundLink = link;
         final String foundId = postId;
+        final boolean foundVerified = verified;
         final String foundUri = mediaUri;
+        final String foundVideoUrl = videoUrl;
+        final String foundKey = key;
         final Context app = context.getApplicationContext();
+        Logger.printInfo(() -> LOG_PREFIX + "tap: media " + foundUri + " surface " + foundVideoUrl + " key " + foundKey
+                + " post " + (foundLink != null) + " verified " + foundVerified);
         toast("getting the video…");
         try {
             new Thread(() -> {
                 try {
-                    run(app, foundLink, foundId, foundUri, playerDurationMs);
+                    run(app, foundLink, foundId, foundVerified, foundUri, foundVideoUrl, foundKey, playerDurationMs);
                 } catch (Throwable ex) {
                     log(LOG_PREFIX + "failed", ex);
                     toast("failed. " + ex.getMessage());
@@ -241,60 +288,140 @@ public final class GigiRedditFactCheck {
         return null;
     }
 
-    /** Looks for the post in screen arguments and fields. */
+    /**
+     * Id of a Reddit-hosted video ("abc123xyz" of https://v.redd.it/abc123xyz/DASHPlaylist.mpd),
+     * or null for other hosts.
+     */
+    static String mediaKey(String url) {
+        try {
+            if (url == null || !url.startsWith("https://")) return null;
+            Uri uri = Uri.parse(url);
+            String host = uri.getHost();
+            if (host == null || !host.endsWith("redd.it") || host.equals("i.redd.it")
+                    || host.endsWith("preview.redd.it")) return null;
+            for (String segment : uri.getPathSegments()) {
+                if (segment.length() >= 8 && segment.matches("[A-Za-z0-9]+")) return segment;
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    /** If the post's video urls contain the media id. */
+    private static boolean matches(Link link, String key) {
+        try {
+            Post post = fromLink(link);
+            for (String url : new String[]{post.dashUrl, post.hlsUrl, post.fallbackUrl, post.externalUrl}) {
+                if (url != null && url.contains(key)) return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    /**
+     * Walks screen objects for a post: the first Link (without a key), or the Link whose video has the key.
+     * Bounded by object count, depth and time, since it runs on the main thread.
+     */
     private static final class Finder {
+        private static final int MAX_OBJECTS = 30_000;
+        private static final int MAX_DEPTH = 8;
+        private static final int MAX_ITEMS = 300;
+        private static final long MAX_MILLIS = 300;
+
+        final String key;
         Link link;
         String postId;
-        private int visited;
-        private boolean inFields;
+        private final java.util.IdentityHashMap<Object, Boolean> seen = new java.util.IdentityHashMap<>();
+        private long deadline;
 
-        void scan(Object value, int depth) {
-            if (value == null || link != null || depth > 3 || ++visited > 400) return;
+        Finder(String key) { this.key = key; }
+
+        /** @param ids If strings may give a post id (screen arguments only: fields hold other posts' ids). */
+        void walk(Object root, boolean ids) {
+            if (root == null || link != null) return;
+            deadline = android.os.SystemClock.uptimeMillis() + MAX_MILLIS;
+            java.util.ArrayDeque<Object[]> queue = new java.util.ArrayDeque<>();
+            queue.add(new Object[]{root, 0});
+            while (!queue.isEmpty() && link == null) {
+                if (seen.size() > MAX_OBJECTS || android.os.SystemClock.uptimeMillis() > deadline) return;
+                Object[] entry = queue.poll();
+                Object value = entry[0];
+                int depth = (Integer) entry[1];
+                if (value == null || seen.put(value, Boolean.TRUE) != null) continue;
+                try {
+                    visit(value, depth, ids, queue);
+                } catch (Throwable ignored) {
+                    // A collection changed while iterating, or a field cannot be read: skip it.
+                }
+            }
+        }
+
+        private void add(java.util.ArrayDeque<Object[]> queue, Object value, int depth) {
+            if (value != null && depth <= MAX_DEPTH && !(value instanceof Number) && !(value instanceof Boolean)
+                    && !(value instanceof Enum)) queue.add(new Object[]{value, depth});
+        }
+
+        private void visit(Object value, int depth, boolean ids, java.util.ArrayDeque<Object[]> queue)
+                throws IllegalAccessException {
             if (value instanceof Link) {
-                link = (Link) value;
-            } else if (value instanceof Bundle) {
-                Bundle bundle = (Bundle) value;
-                for (String key : bundle.keySet()) {
-                    Object item;
-                    try {
-                        item = bundle.get(key);
-                    } catch (Throwable ex) {
-                        continue;
-                    }
-                    scan(item, depth + 1);
-                }
-            } else if (value instanceof Collection) {
-                int count = 0;
-                for (Object item : (Collection<?>) value) {
-                    if (++count > 8) break;
-                    scan(item, depth + 1);
-                }
-            } else if (value instanceof CharSequence) {
-                // Ids only from screen arguments: a field may hold some other post's id.
-                if (postId == null && !inFields) {
+                Link candidate = (Link) value;
+                if (key == null || matches(candidate, key)) link = candidate;
+                return; // Not into posts: their crossposts are other posts.
+            }
+            if (value instanceof CharSequence) {
+                if (ids && postId == null) {
                     Matcher m = POST_ID.matcher(value.toString());
                     if (m.find()) postId = m.group(1);
                 }
+                return;
             }
-        }
-
-        void scanFields(Object screen) {
-            inFields = true;
-            for (Class<?> type = screen.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
-                String name = type.getName();
-                if (name.startsWith("android.") || name.startsWith("androidx.")) break;
+            if (value instanceof Bundle) {
+                Bundle bundle = (Bundle) value;
+                for (String k : bundle.keySet()) add(queue, bundle.get(k), depth + 1);
+                return;
+            }
+            if (value instanceof java.util.Map) {
+                int count = 0;
+                for (Object item : ((java.util.Map<?, ?>) value).values()) {
+                    if (++count > MAX_ITEMS) break;
+                    add(queue, item, depth + 1);
+                }
+                return;
+            }
+            if (value instanceof Iterable) {
+                int count = 0;
+                for (Object item : (Iterable<?>) value) {
+                    if (++count > MAX_ITEMS) break;
+                    add(queue, item, depth + 1);
+                }
+                return;
+            }
+            Class<?> type = value.getClass();
+            if (type.isArray()) {
+                if (type.getComponentType().isPrimitive()) return;
+                Object[] array = (Object[]) value;
+                for (int i = 0; i < array.length && i < MAX_ITEMS; i++) add(queue, array[i], depth + 1);
+                return;
+            }
+            if (!appClass(type)) return;
+            for (; type != null && appClass(type); type = type.getSuperclass()) {
                 for (Field field : type.getDeclaredFields()) {
-                    if (link != null) return;
                     if (Modifier.isStatic(field.getModifiers()) || field.getType().isPrimitive()) continue;
-                    try {
-                        field.setAccessible(true);
-                        scan(field.get(screen), 1);
-                    } catch (Throwable ignored) {
-                    }
+                    field.setAccessible(true);
+                    add(queue, field.get(value), depth + 1);
                 }
             }
         }
+
+        /** Reddit's own classes (obfuscated ones have no package) and Compose/flow state holders. */
+        private static boolean appClass(Class<?> type) {
+            String name = type.getName();
+            return name.indexOf('.') < 0 || name.startsWith("com.reddit.")
+                    || name.startsWith("kotlinx.coroutines.flow.") || name.startsWith("androidx.compose.runtime.");
+        }
     }
+
 
     private static String call(java.util.concurrent.Callable<String> getter) {
         try {
@@ -391,8 +518,8 @@ public final class GigiRedditFactCheck {
 
     // endregion
 
-    private static void run(Context context, Link link, String postId, String mediaUri, long playerDurationMs)
-            throws Exception {
+    private static void run(Context context, Link link, String postId, boolean verified, String mediaUri,
+                            String videoUrl, String key, long playerDurationMs) throws Exception {
         Post post = null;
         if (link != null) post = fromLink(link);
         if (post == null && postId != null) {
@@ -402,9 +529,24 @@ public final class GigiRedditFactCheck {
                 log(LOG_PREFIX + "could not load post " + postId, ex);
             }
         }
+        if (post == null && key != null) {
+            // The post was not found, but the video is known: send it with its own link,
+            // which opens the post.
+            post = new Post();
+            post.permalink = "https://v.redd.it/" + key;
+            verified = true;
+            Logger.printInfo(() -> LOG_PREFIX + "no post for " + key + ", sending the video with its link");
+        }
         if (post == null) {
             toast("open the post (its comments), then tap 🔎 again");
             return;
+        }
+        // The player's own manifest or file when the post has none.
+        for (String url : new String[]{mediaUri, videoUrl}) {
+            if (post.dashUrl == null && isManifest(url) && (verified || key == null)) post.dashUrl = url;
+        }
+        if (post.dashUrl == null && key != null && verified && "v.redd.it".equals(Uri.parse(post.permalink).getHost())) {
+            post.dashUrl = "https://v.redd.it/" + key + "/DASHPlaylist.mpd";
         }
         if (post.permalink == null && post.id != null) {
             post.permalink = post.subreddit != null
@@ -413,8 +555,9 @@ public final class GigiRedditFactCheck {
         }
         final String caption = caption(post);
         final Post p = post;
+        final String playing = mediaUri;
         Logger.printInfo(() -> LOG_PREFIX + "post " + p.id + " dash: " + p.dashUrl + " fallback: " + p.fallbackUrl
-                + " player: " + mediaUri);
+                + " player: " + playing);
 
         File directory = new File(context.getCacheDir(), "gigi_factcheck");
         //noinspection ResultOfMethodCallIgnored
@@ -426,6 +569,7 @@ public final class GigiRedditFactCheck {
         boolean found = false;
 
         // 1. The player's own file, when it is a direct MP4 small enough.
+        if (!isDirectMp4(mediaUri) && verified && isDirectMp4(videoUrl)) mediaUri = videoUrl;
         if (isDirectMp4(mediaUri)) {
             try {
                 long size = probeLength(mediaUri);
@@ -442,7 +586,7 @@ public final class GigiRedditFactCheck {
         if (!found && post.dashUrl != null) {
             String result = null;
             try {
-                result = fromDash(post.dashUrl, directory, output, playerDurationMs, mediaUri, post.id);
+                result = fromDash(post.dashUrl, directory, output, playerDurationMs, mediaUri, post.id, verified);
             } catch (Exception ex) {
                 log(LOG_PREFIX + "DASH failed, trying the fallback MP4", ex);
             }
@@ -485,6 +629,12 @@ public final class GigiRedditFactCheck {
         return url != null && url.startsWith("https://");
     }
 
+    private static boolean isManifest(String url) {
+        if (!isHttps(url)) return false;
+        String path = Uri.parse(url).getPath();
+        return path != null && path.toLowerCase(Locale.US).endsWith(".mpd");
+    }
+
     private static boolean isDirectMp4(String url) {
         if (!isHttps(url)) return false;
         String path = Uri.parse(url).getPath();
@@ -498,12 +648,12 @@ public final class GigiRedditFactCheck {
      *         video than the one playing, or null if nothing fits.
      */
     private static String fromDash(String dashUrl, File directory, File output, long playerDurationMs,
-                                   String mediaUri, String postId) throws Exception {
+                                   String mediaUri, String postId, boolean verified) throws Exception {
         List<Rendition> renditions = new ArrayList<>();
         long durationMs = parseManifest(dashUrl, httpGet(dashUrl, 1_000_000), renditions);
 
         // The post found on the screen may be another one than the playing video (a video pager).
-        boolean sameMedia = mediaUri != null && postId != null && mediaUri.contains(postId);
+        boolean sameMedia = verified || (mediaUri != null && postId != null && mediaUri.contains(postId));
         if (!sameMedia && mediaUri != null) {
             String folder = mediaFolder(dashUrl);
             sameMedia = folder != null && mediaUri.contains(folder);

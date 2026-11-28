@@ -57,18 +57,16 @@ The bot should reply "🔎 Got it, checking…".
 
 ## Status (branch `claude/reddit-factcheck-button`, not built yet)
 
-Done, without the obfuscated names:
-- `GigiRedditFactCheck` (extension): finds the post's `com.reddit.domain.model.Link` in the top screen's
-  args/fields (same native helpers as Gigi Back and Forward, `Lpzo0;->I`, `navstack/v;->c`), or a `t3_` id
-  there (then public `by_id` JSON, fetched on tap), reads the v.redd.it DASH manifest, picks H.264 ≤720p +
-  audio that fit 19.5 MB, merges with MediaMuxer, shares to Telegram (`gigi_factcheck_chat_id`, same as YouTube).
-  Refuses if the manifest duration is >2.5 s from the player's (a video pager showing another post).
-- 🔎 button in `GigiPlayerControls`, setting `gigi_reddit_factcheck_button` (default on) + chat id in Misc.
+Mapped in Reddit 2026.40.0 (versionCode 2640091, arm64-v8a .apkm, sha256 2973c2f2…abce):
+- Player media item: `eci.j()` Timeline `o3j0` → `n(f(), new m3j0())` → `m3j0.b` MediaItem `kbu` →
+  `kbu.b` LocalConfiguration `hbu` → `hbu.a` Uri. (eci has no getCurrentMediaItem; built from these.)
+- The video surface model `exokit/internal/ui/b` holds no post: only `VideoProps` (`gon0`: url,
+  playbackKey `yh10`(mediaId, surface)…) and the current url in field `r`. mediaId is derived from the
+  video url (`gau.b`), so the post is found by the v.redd.it id instead: a bounded walk (30k objects,
+  depth 8, 300 ms) over the top screen's args and fields for the `Link` whose video urls contain that id.
+- Fallbacks: the screen's own post, checked by duration (±2.5 s against the manifest); with no post, the
+  video is sent with `https://v.redd.it/<id>` as the link.
 
-Still needs the APK (Reddit **2026.40.0, versionCode 2640091, arm64-v8a**, the exact build the Gigi patches
-target). Two stubs in `GigiRedditFactCheck` return null until patched:
-- `surfacePost(Object surfaceModel)`: the `Link` bound to `Lcom/reddit/exokit/internal/ui/b;` (feed support).
-- `playerMediaUri(Object player)`: `Leci;` → current MediaItem → localConfiguration.uri (direct MP4 first, and
-  a surer match than the duration check).
-APK mirrors were not reachable from the cloud session (APKMirror/APKPure: Cloudflare challenge; Uptodown:
-captcha token). Upload that APK (or the .apkm bundle) to the session/repo to finish these.
+`GigiRedditFactCheck` (extension) does the work on tap; `GigiRedditPatches.kt` fills its one-step stubs
+(`topScreen`, `screenArgs`, `surfaceUrl`, `timeline`, `itemIndex`, `windowCount`, `newWindow`, `windowUri`).
+Untested on a device: needs a build (GitHub Actions minutes return Dec 1).
