@@ -12,7 +12,6 @@ import app.morphe.patcher.InstructionLocation
 import app.morphe.patcher.InstructionLocation.MatchAfterImmediately
 import app.morphe.patcher.InstructionLocation.MatchAfterWithin
 import app.morphe.patcher.InstructionLocation.MatchFirst
-import app.morphe.patcher.StringComparisonType
 import app.morphe.patcher.anyInstruction
 import app.morphe.patcher.checkCast
 import app.morphe.patcher.fieldAccess
@@ -554,6 +553,62 @@ internal class SubtitleManagerSelectedTrackFingerprint(trackType: String) : Fing
 )
 
 /**
+ * Same method as [SubtitleManagerSelectedTrackFingerprint].
+ * The new selection event is created with the video ID of the manager.
+ */
+internal object SubtitleManagerSelectionVideoIdFingerprint : Fingerprint(
+    classFingerprint = SubtitleManagerFingerprintClassFingerprint,
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "V",
+    parameters = listOf("L"),
+    filters = listOf(
+        string(""),
+        methodCall(definingClass = "this", parameters = listOf(), returnType = "Ljava/lang/String;"),
+        opcode(Opcode.MOVE_RESULT_OBJECT, MatchAfterImmediately()),
+        methodCall(name = "<init>", location = MatchAfterImmediately())
+    )
+)
+
+/**
+ * When a video loads and captions are enabled, the default track is selected.
+ */
+internal object SubtitleManagerDefaultTrackGateFingerprint : Fingerprint(
+    classFingerprint = SubtitleManagerFingerprintClassFingerprint,
+    returnType = "V",
+    filters = listOf(
+        methodCall(reference = { SubtitleManagerFingerprintClassFingerprint.originalMethod }),
+        opcode(Opcode.MOVE_RESULT, MatchAfterImmediately()),
+        opcode(Opcode.IF_EQZ, MatchAfterImmediately()),
+        opcode(Opcode.NEW_INSTANCE, MatchAfterImmediately()),
+        methodCall(
+            reference = { DefaultCaptionTrackFingerprint.originalMethod },
+            location = MatchAfterImmediately()
+        )
+    )
+)
+
+/**
+ * Same as [SubtitleManagerDefaultTrackGateFingerprint], for segmented captions
+ * that load their tracks from the playback manifest.
+ */
+internal object SubtitleManagerManifestTrackGateFingerprint : Fingerprint(
+    classFingerprint = SubtitleManagerFingerprintClassFingerprint,
+    returnType = "V",
+    filters = listOf(
+        methodCall(reference = { SubtitleManagerFingerprintClassFingerprint.originalMethod }),
+        opcode(Opcode.MOVE_RESULT, MatchAfterImmediately()),
+        opcode(Opcode.IF_EQZ, MatchAfterImmediately()),
+        opcode(Opcode.NEW_INSTANCE, MatchAfterImmediately()),
+        methodCall(
+            definingClass = "this",
+            parameters = listOf(),
+            returnType = "Ljava/util/List;",
+            location = MatchAfterImmediately()
+        )
+    )
+)
+
+/**
  * Result callback of the requests of the native caption track handler.
  * It casts to the request that [CaptionFileParserFingerprint] reads the track of.
  */
@@ -629,7 +684,7 @@ internal object PlayerOverlayStateToStringFingerprint : Fingerprint(
     name = "toString",
     returnType = "Ljava/lang/String;",
     filters = listOf(
-        string("isPipActive", StringComparisonType.CONTAINS)
+        string("watchDynamicLayoutState;isVrActive;isInlineActive;isPipActive")
     )
 )
 
@@ -705,7 +760,10 @@ internal object CueRangeManagerSeekFingerprint : Fingerprint(
     returnType = "J",
     parameters = listOf("J", "J", "Z"),
     filters = listOf(
-        string("CueRangeManager", StringComparisonType.CONTAINS)
+        anyInstruction(
+            string("CueRangeManager state error: newPosition="),
+            string("CueRangeManager state error: newPosition=%d") // 21.20+
+        )
     )
 )
 

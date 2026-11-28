@@ -93,6 +93,7 @@ Changes include:
     <string name="morphe_hide_account_menu_badges_title">Hide Badges</string>
     <string name="morphe_hide_account_menu_downloads_title">Hide Downloads</string>
     <string name="morphe_hide_account_menu_liked_videos_title">Hide \'Liked videos\'</string>
+    <string name="morphe_hide_account_menu_privacy_tos_footer_title">Hide \'Privacy Policy\' \'Terms of Service\' footer</string>
     <string name="morphe_hide_account_menu_watch_later_title">Hide \'Watch later\'</string>
     <string name="morphe_hide_album_cards_title">Hide album cards</string>
     <string name="morphe_hide_album_cards_summary">Hides the album cards under the artist description</string>
@@ -1410,6 +1411,10 @@ Settings → Playback (or Autoplay) → Autoplay next video"</string>
     <string name="morphe_autoplay_mix_length">Mix: %s videos</string>
     <string name="morphe_autoplay_mix_no_limit">Mix: no limit</string>
 
+    <!-- interaction.cast.restoreOldCastPatch -->
+    <string name="morphe_restore_old_cast_behavior_title">Restore old Cast behavior</string>
+    <string name="morphe_restore_old_cast_behavior_summary">The Cast session stays connected when selecting a different video or closing the player, so videos keep playing on the TV</string>
+
     <!-- interaction.continuewatching.disableContinueWatchingPromptPatch -->
     <string name="morphe_continue_watching_prompt_title">\'Continue watching?\' prompt</string>
     <string name="morphe_continue_watching_prompt_entry_1">Default</string>
@@ -1564,6 +1569,12 @@ Automotive layout
     <string name="morphe_shorts_autoplay_summary">Advances to the next Short automatically instead of repeating the current one</string>
     <string name="morphe_shorts_autoplay_background_title">Autoplay in background</string>
     <string name="morphe_shorts_autoplay_background_summary">Advances to the next Short automatically during background playback</string>
+    <string name="morphe_shorts_autoplay_flyout_button_title">Autoplay in the Shorts menu</string>
+    <string name="morphe_shorts_autoplay_flyout_button_summary">Shows an item in the Shorts player menu that turns Autoplay Shorts on or off</string>
+    <string name="morphe_shorts_autoplay_flyout_title_on">Autoplay Shorts · On</string>
+    <string name="morphe_shorts_autoplay_flyout_title_off">Autoplay Shorts · Off</string>
+    <string name="morphe_shorts_autoplay_flyout_toast_on">Autoplay Shorts turned on</string>
+    <string name="morphe_shorts_autoplay_flyout_toast_off">Autoplay Shorts turned off</string>
     <string name="morphe_skip_live_shorts_title">Skip live Shorts</string>
     <string name="morphe_skip_live_shorts_summary">Skips live streams that appear in the Shorts feed</string>
 
@@ -1593,9 +1604,13 @@ Automotive layout
     <string name="morphe_feed_card_layout_entry_1">Classic</string>
     <string name="morphe_feed_card_layout_entry_2">Cards</string>
     <string name="morphe_feed_card_layout_entry_3">Cards with like, comment and save buttons</string>
+    <string name="morphe_feed_card_layout_entry_4">Cards with avatar glow</string>
+    <string name="morphe_feed_card_layout_entry_5">Cards with like, comment and save buttons and avatar glow</string>
     <string name="morphe_feed_card_layout_comments">Comments</string>
 
     <!-- layout.miniplayer.miniplayerPatch -->
+    <string name="morphe_miniplayer_restore_session_title">Continue watching on startup</string>
+    <string name="morphe_miniplayer_restore_session_summary">Saves your playback and queue on this device and opens it paused when YouTube starts</string>
     <string name="morphe_miniplayer_disable_resuming_title">Disable resuming miniplayer</string>
     <string name="morphe_miniplayer_disable_resuming_summary">Disables the \'Continue watching\' miniplayer, a YouTube Premium feature that appears on app startup</string>
     <string name="morphe_miniplayer_screen_summary">Customize the appearance and behavior of the minimized video player</string>
@@ -1689,6 +1704,10 @@ Automotive layout
     <string name="morphe_custom_branding_icon_entry_8">Original analog</string>
     <string name="morphe_custom_branding_icon_entry_9">Original cake</string>
     <string name="morphe_custom_branding_icon_entry_10">Original metal</string>
+    <string name="morphe_custom_branding_icon_entry_11">Original fur</string>
+    <string name="morphe_custom_branding_icon_entry_12">Original watercolor</string>
+    <string name="morphe_custom_branding_icon_entry_13">Original classic</string>
+    <string name="morphe_custom_branding_icon_entry_14">Original retro TV</string>
 
     <!-- layout.branding.header.changeHeaderPatch -->
     <string name="morphe_header_logo_entry_1">Default</string>
@@ -1828,6 +1847,9 @@ Videos are requested by a short prefix of the hashed video ID, so the server can
     <!-- misc.links.openLinksExternallyPatch -->
     <string name="morphe_external_browser_title">Open links in browser</string>
     <string name="morphe_external_browser_summary">Opens links in an external browser instead of the in-app browser</string>
+
+    <!-- misc.links.openSharedLinksPatch -->
+    <string name="morphe_open_shared_links_no_link">No YouTube link in the shared text</string>
 
     <!-- video.buffer.playbackBufferPatch -->
     <string name="morphe_playback_buffer_size_title">Playback buffer size</string>
